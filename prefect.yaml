@@ -10,7 +10,7 @@ pull:
 deployments:
   - name: local-mail-processing
     version: issue-1
-    description: Gmail 증분 수집과 메일 근거 추출
+    description: Incremental Gmail collection and evidence extraction
     entrypoint: src/pungmail/workflows/mail_processing.py:mail_processing
     parameters:
       trigger_type: SCHEDULED
@@ -25,7 +25,7 @@ deployments:
 
   - name: local-order-status-refresh
     version: issue-1
-    description: 오더시트·재고 갱신 워크플로 골격
+    description: Order sheet and inventory refresh workflow
     entrypoint: src/pungmail/workflows/order_status_refresh.py:order_status_refresh
     parameters:
       trigger_type: SCHEDULED

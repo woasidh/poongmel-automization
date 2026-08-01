@@ -26,14 +26,18 @@ def test_management_pages_render_observable_run(isolated_settings, monkeypatch) 
     assert health.status_code == 200
     assert health.json()["database"] is True
 
-    for path, expected in (
-        ("/", "운영 대시보드"),
-        ("/workflows/mail_processing", "메일 처리"),
-        ("/runs", "실행 이력"),
-        (f"/runs/{run_id}", "discover_gmail"),
-        ("/mails", "(수집 대기)"),
-        ("/mails/message-ui", "message-ui"),
+    for path, expected_values in (
+        ("/", ("운영 대시보드",)),
+        (
+            "/workflows/mail_processing",
+            ("메일 처리", "발주", "오더시트·재고표 확인", "오더", "RW·SI DB 처리", "보류"),
+        ),
+        ("/runs", ("실행 이력",)),
+        (f"/runs/{run_id}", ("discover_gmail",)),
+        ("/mails", ("(수집 대기)",)),
+        ("/mails/message-ui", ("message-ui",)),
     ):
         response = client.get(path)
         assert response.status_code == 200
-        assert expected in response.text
+        for expected in expected_values:
+            assert expected in response.text

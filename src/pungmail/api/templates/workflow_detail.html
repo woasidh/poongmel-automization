@@ -4,9 +4,16 @@
 {% block content %}
 <section class="panel flow-panel">
   <div class="panel-head"><h2>노드 흐름</h2><span>{{ graph|length }}개 노드</span></div>
-  <div class="common-flow">
-    {% for node in graph if node.stage == 'common' and not node.branch %}
-      {% if workflow_type != 'mail_processing' or node.key in ['discover_gmail','enqueue_message','validate_scope','collect_thread','extract_evidence','lookup_catalog','classify_and_extract','resolve_case'] %}<div class="flow-node"><small>{{ node.key }}</small><strong>{{ node.label }}</strong></div>{% endif %}
+  {% set common = namespace(nodes=[]) %}
+  {% for node in graph if node.stage == 'common' and not node.branch %}
+    {% if workflow_type != 'mail_processing' or node.key in ['discover_gmail','enqueue_message','validate_scope','collect_thread','extract_evidence','lookup_catalog','classify_and_extract','resolve_case'] %}
+      {% set common.nodes = common.nodes + [node] %}
+    {% endif %}
+  {% endfor %}
+  <div class="flow-rows">
+    {% for row in common.nodes|batch(4) %}
+      <div class="common-flow">{% for node in row %}<div class="flow-node"><small>{{ node.key }}</small><strong>{{ node.label }}</strong></div>{% endfor %}</div>
+      {% if not loop.last %}<div class="flow-down" aria-hidden="true">↓</div>{% endif %}
     {% endfor %}
   </div>
   {% if workflow_type == 'mail_processing' %}

@@ -18,6 +18,7 @@ if (Test-Path -LiteralPath $pidPath) {
     if ($alive.Count -gt 0) {
         throw "Pungmail processes are already running. Check scripts/status.ps1."
     }
+    Remove-Item -LiteralPath $pidPath -Force
 }
 
 New-Item -ItemType Directory -Path $logPath,$prefectHome -Force | Out-Null
@@ -30,8 +31,10 @@ $env:PUNGMAIL_PROJECT_ROOT = $projectRoot
 Push-Location $projectRoot
 try {
     & $pythonPath -m pungmail.cli db-upgrade
+    if ($LASTEXITCODE -ne 0) { throw "Database migration failed with exit code $LASTEXITCODE." }
 
     $server = Start-Process -FilePath $prefectPath -ArgumentList @("server","start","--host","127.0.0.1","--port","4200") -WorkingDirectory $projectRoot -RedirectStandardOutput (Join-Path $logPath "prefect-server.stdout.log") -RedirectStandardError (Join-Path $logPath "prefect-server.stderr.log") -WindowStyle Hidden -PassThru
+    [ordered]@{ prefect_server = $server.Id } | ConvertTo-Json | Set-Content -LiteralPath $pidPath -Encoding utf8
 
     $prefectReady = $false
     for ($attempt = 0; $attempt -lt 45; $attempt++) {
@@ -47,7 +50,9 @@ try {
     }
 
     & $prefectPath work-pool create "pungmail-local" --type process --overwrite
+    if ($LASTEXITCODE -ne 0) { throw "Prefect work-pool setup failed with exit code $LASTEXITCODE." }
     & $prefectPath deploy --all
+    if ($LASTEXITCODE -ne 0) { throw "Prefect deployment failed with exit code $LASTEXITCODE." }
 
     $worker = Start-Process -FilePath $prefectPath -ArgumentList @("worker","start","--pool","pungmail-local") -WorkingDirectory $projectRoot -RedirectStandardOutput (Join-Path $logPath "prefect-worker.stdout.log") -RedirectStandardError (Join-Path $logPath "prefect-worker.stderr.log") -WindowStyle Hidden -PassThru
     $ui = Start-Process -FilePath $pythonPath -ArgumentList @("-m","pungmail.cli","serve-ui","--host","127.0.0.1","--port","8000") -WorkingDirectory $projectRoot -RedirectStandardOutput (Join-Path $logPath "ui.stdout.log") -RedirectStandardError (Join-Path $logPath "ui.stderr.log") -WindowStyle Hidden -PassThru

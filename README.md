@@ -13,4 +13,6 @@
 
 프로세스 상태는 `scripts/status.ps1`, 종료는 `scripts/stop.ps1`로 확인·수행한다.
 
+화면 검수용 메일·첨부 근거가 필요하면 실행 중 `scripts/seed-demo.ps1`을 한 번 실행한다. 메일 근거 화면에서 `demo-mail-001`을 확인할 수 있다.
+
 기존 `C:\Users\ASUS\Documents\New project`의 코드·DB·토큰은 수정하지 않는다. Gmail token은 읽기 전용으로 불러오며 refresh가 필요하면 메모리에서만 갱신한다.

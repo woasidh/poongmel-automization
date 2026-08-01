@@ -11,7 +11,9 @@ if (-not (Test-Path -LiteralPath $pythonPath)) {
 
 Write-Host "[2/4] Installing pinned dependencies."
 & $pythonPath -m pip install --upgrade pip
+if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed with exit code $LASTEXITCODE." }
 & $pythonPath -m pip install -e "$projectRoot[dev]"
+if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed with exit code $LASTEXITCODE." }
 
 $envPath = Join-Path $projectRoot ".env"
 $examplePath = Join-Path $projectRoot ".env.example"
@@ -26,6 +28,7 @@ Write-Host "[4/4] Preparing the local database."
 Push-Location $projectRoot
 try {
     & $pythonPath -m pungmail.cli db-upgrade
+    if ($LASTEXITCODE -ne 0) { throw "Database migration failed with exit code $LASTEXITCODE." }
 } finally {
     Pop-Location
 }

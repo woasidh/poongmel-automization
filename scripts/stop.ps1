@@ -3,6 +3,17 @@ $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $pidPath = Join-Path $projectRoot "runtime\pids.json"
 
+function Stop-ProcessTree {
+    param([int]$RootProcessId)
+    $children = @(Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq $RootProcessId })
+    foreach ($child in $children) {
+        Stop-ProcessTree -RootProcessId ([int]$child.ProcessId)
+    }
+    if (Get-Process -Id $RootProcessId -ErrorAction SilentlyContinue) {
+        Stop-Process -Id $RootProcessId -Force -ErrorAction Stop
+    }
+}
+
 if (-not (Test-Path -LiteralPath $pidPath)) {
     Write-Host "No recorded Pungmail processes."
     exit 0
@@ -13,7 +24,7 @@ foreach ($property in $pids.PSObject.Properties) {
     $processId = [int]$property.Value
     $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
     if ($process) {
-        Stop-Process -Id $processId -ErrorAction Stop
+        Stop-ProcessTree -RootProcessId $processId
         Write-Host "Stopped $($property.Name). PID=$processId"
     }
 }
