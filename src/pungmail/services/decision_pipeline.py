@@ -267,6 +267,21 @@ def _document_request_item(subject: str) -> CatalogItemInput | None:
     )
 
 
+def _supplier_route_for_items(items: list[CatalogItemInput]) -> str:
+    catalog = CompanyCatalog()
+    suppliers: set[str] = set()
+    for item in items:
+        matches = catalog.lookup(item.item_code or item.raw_product_name)
+        if len(matches) != 1:
+            return "기타"
+        suppliers.add(matches[0].company_from_product_group)
+    if suppliers == {"NIKKO"}:
+        return "nikko"
+    if suppliers == {"SEIWA"}:
+        return "seiwa"
+    return "기타"
+
+
 def apply_direction_guards(
     decision: MailDecision,
     evidence: dict[str, Any],
@@ -315,7 +330,7 @@ def apply_direction_guards(
                 payload_type="PUNGLIM_DOCUMENT",
                 items=[item],
                 components=components,
-                supplier_route="기타",
+                supplier_route=_supplier_route_for_items([item]),
                 recipient=next(
                     (
                         address
@@ -363,7 +378,32 @@ def apply_direction_guards(
     if decision.category == Category.PUNGLIM_DOCUMENT and isinstance(
         decision.category_payload, PunglimDocumentRequestPayload
     ):
-        if sender_is_richwood or not has_richwood_recipient:
+        if sender_is_richwood:
+            payload = decision.category_payload
+            components = _document_request_components(evidence) or payload.components
+            item_from_subject = _document_request_item(str(first.get("subject") or ""))
+            items = [item_from_subject] if item_from_subject else payload.items
+            normalized_payload = payload.model_copy(
+                update={
+                    "items": items,
+                    "components": components,
+                    "supplier_route": _supplier_route_for_items(items),
+                    "recipient": next(
+                        (
+                            address
+                            for address in first.get("recipients", [])
+                            if not str(address).casefold().endswith(
+                                f"@{RICHWOOD_DOMAIN}"
+                            )
+                        ),
+                        payload.recipient,
+                    ),
+                }
+            )
+            return decision.model_copy(
+                update={"category_payload": normalized_payload}
+            )
+        if not has_richwood_recipient:
             return decision
         payload = decision.category_payload
         customer_payload = SampleDocumentQuotePayload(

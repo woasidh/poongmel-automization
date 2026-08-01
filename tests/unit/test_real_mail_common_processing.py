@@ -298,3 +298,19 @@ def test_outgoing_supplier_document_request_is_not_generic_internal_work() -> No
 
     assert guarded_hold.category.value == "풍림자료요청"
     assert guarded_hold.category_payload.supplier_route == "기타"
+
+    already_punglim = guarded_hold.model_copy(
+        update={
+            "category_payload": guarded_hold.category_payload.model_copy(
+                update={"supplier_route": "nikko"}
+            )
+        }
+    )
+    normalized = apply_direction_guards(already_punglim, evidence)
+
+    assert normalized.category.value == "풍림자료요청"
+    assert normalized.category_payload.supplier_route == "기타"
+    assert [component.completed for component in normalized.category_payload.components] == [
+        True,
+        False,
+    ]
