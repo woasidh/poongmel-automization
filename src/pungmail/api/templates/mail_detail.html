@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}메일 상세 · 풍멜이{% endblock %}
+{% block heading %}메일 상세{% endblock %}
+{% block content %}
+<section class="mail-title"><div><span class="pill {{ event.status|lower }}">{{ event.status }}</span><h2>{{ message.subject }}</h2><p>{{ message.sender }} · {{ message.internal_date_utc.strftime('%Y-%m-%d %H:%M:%S') if message.internal_date_utc else '-' }}</p></div><div class="id-box"><span>Gmail message</span><code>{{ message.message_id }}</code><span>thread</span><code>{{ message.thread_id }}</code></div></section>
+{% if message.exclusion_reason %}<div class="notice warning">수집 제외 사유: {{ message.exclusion_reason }}</div>{% endif %}
+<section class="panel"><div class="panel-head"><h2>노드 흐름</h2><span>{{ nodes|length }}개 기록</span></div><div class="node-chips">{% for node in nodes %}<span class="node-chip {{ node.status|lower }}"><small>{{ node.branch_key or '공통' }}</small>{{ node.node_key }}<em>{{ node.status }}</em></span>{% endfor %}</div></section>
+<section class="panel"><div class="panel-head"><h2>전체 스레드</h2><span>{{ thread_views|length }}개 메시지</span></div>
+{% for item in thread_views %}<article class="thread-message"><header><div><strong>{{ item.row.sender }}</strong><span>{{ item.row.subject }}</span></div><time>{{ item.row.internal_date_utc.strftime('%Y-%m-%d %H:%M:%S') if item.row.internal_date_utc else '-' }}</time></header><h3>실제 작성문</h3><pre>{{ item.actual_body or '(분리된 작성문 없음)' }}</pre>{% if item.quoted_body %}<details><summary>인용된 이전 내용 보기</summary><pre>{{ item.quoted_body }}</pre></details>{% endif %}</article>{% endfor %}
+</section>
+<section class="panel"><div class="panel-head"><h2>첨부·OCR 근거</h2><span>{{ attachment_views|length }}개 파일</span></div>
+{% for item in attachment_views %}<article class="attachment-card"><header><div><strong>{{ item.row.file_name }}</strong><small>{{ item.row.mime_type }} · {{ item.row.size_bytes }} bytes</small></div><span class="pill {{ item.row.extraction_status|lower }}">{{ item.row.extraction_status }}</span></header><code>SHA-256 {{ item.row.sha256 or '-' }}</code>{% if item.extracted_text %}<details open><summary>추출 텍스트</summary><pre>{{ item.extracted_text }}</pre></details>{% endif %}{% if item.ocr_text %}<details open><summary>OCR 결과</summary><pre>{{ item.ocr_text }}</pre></details>{% endif %}{% set warnings = parse_json(item.row.warning_json, []) %}{% if warnings %}<div class="notice warning">{{ warnings|join(' · ') }}</div>{% endif %}</article>{% else %}<div class="empty">첨부파일이 없습니다.</div>{% endfor %}
+</section>
+<section class="panel"><div class="panel-head"><h2>근거 스냅샷</h2><span>{{ evidence|length }}건</span></div>{% for item in evidence %}<div class="evidence-row"><span><strong>{{ item.evidence_type }}</strong><small>{{ item.source_key }}</small></span><code>{{ item.sha256 }}</code></div>{% else %}<div class="empty">스냅샷이 없습니다.</div>{% endfor %}</section>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}워크플로 · 풍멜이{% endblock %}
+{% block heading %}워크플로 구성{% endblock %}
+{% block content %}
+<p class="lead">운영 워크플로는 아래 두 개뿐입니다. 카테고리 분기는 메일 처리 안에서 실행됩니다.</p>
+<section class="workflow-cards">
+  {% for workflow in workflows %}
+  <a class="workflow-card" href="/workflows/{{ workflow.key }}">
+    <span class="workflow-number">0{{ loop.index }}</span>
+    <div><h2>{{ workflow.name }}</h2><p>{{ workflow.description }}</p></div>
+    <div class="workflow-meta"><strong>{{ workflow.schedule }}</strong><span>{{ workflow.nodes }}개 노드</span></div>
+  </a>
+  {% endfor %}
+</section>
+{% endblock %}

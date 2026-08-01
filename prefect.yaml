@@ -1,0 +1,39 @@
+name: pungmail-next
+prefect-version: 3.8.1
+
+build: []
+push: []
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: C:/Users/ASUS/Desktop/poongmel-automization
+
+deployments:
+  - name: local-mail-processing
+    version: issue-1
+    description: Gmail 증분 수집과 메일 근거 추출
+    entrypoint: src/pungmail/workflows/mail_processing.py:mail_processing
+    parameters:
+      trigger_type: SCHEDULED
+    work_pool:
+      name: pungmail-local
+      work_queue_name: default
+      job_variables: {}
+    schedules:
+      - cron: "* * * * *"
+        timezone: Asia/Seoul
+        active: true
+
+  - name: local-order-status-refresh
+    version: issue-1
+    description: 오더시트·재고 갱신 워크플로 골격
+    entrypoint: src/pungmail/workflows/order_status_refresh.py:order_status_refresh
+    parameters:
+      trigger_type: SCHEDULED
+    work_pool:
+      name: pungmail-local
+      work_queue_name: default
+      job_variables: {}
+    schedules:
+      - cron: "0 * * * *"
+        timezone: Asia/Seoul
+        active: true

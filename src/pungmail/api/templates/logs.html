@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}서버 로그 · 풍멜이{% endblock %}
+{% block heading %}서버 로그{% endblock %}
+{% block content %}
+<form class="filters" method="get"><input name="q" value="{{ q }}" placeholder="Gmail ID, 실행 ID, 메시지 검색"><select name="level"><option value="">전체 레벨</option>{% for value in ['INFO','WARNING','ERROR','CRITICAL'] %}<option value="{{ value }}" {{ 'selected' if level == value }}>{{ value }}</option>{% endfor %}</select><button>검색</button></form>
+<section class="panel log-list">{% for log in logs %}<article><time>{{ log.timestamp }}</time><span class="log-level {{ log.level|lower }}">{{ log.level }}</span><strong>{{ log.logger }}</strong><p>{{ log.message }}</p>{% if log.workflow_run_id or log.gmail_message_id %}<small>{{ log.workflow_run_id or '' }} {{ log.gmail_message_id or '' }}</small>{% endif %}</article>{% else %}<div class="empty">표시할 로그가 없습니다.</div>{% endfor %}</section>
+{% endblock %}

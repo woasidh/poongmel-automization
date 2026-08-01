@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}차세대 풍멜이{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/">
+      <span class="brand-mark">P</span>
+      <span><strong>풍멜이</strong><small>관찰·추적 관리</small></span>
+    </a>
+    <nav>
+      <a href="/">대시보드</a>
+      <a href="/workflows">워크플로</a>
+      <a href="/runs">실행 이력</a>
+      <a href="/mails">메일 근거</a>
+      <a href="/logs">서버 로그</a>
+    </nav>
+    <div class="sidebar-foot">로컬 전용 · v{{ version }}</div>
+  </aside>
+  <main>
+    <header class="topbar">
+      <div><p class="eyebrow">POONGMEL AUTOMATION</p><h1>{% block heading %}대시보드{% endblock %}</h1></div>
+      <span class="local-badge">127.0.0.1 로컬</span>
+    </header>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

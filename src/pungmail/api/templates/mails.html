@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}메일 근거 · 풍멜이{% endblock %}
+{% block heading %}메일 근거{% endblock %}
+{% block content %}
+<form class="filters" method="get"><input name="q" value="{{ q }}" placeholder="제목, 발신자, Gmail ID 검색"><select name="status"><option value="">전체 상태</option>{% for value in ['QUEUED','RUNNING','EXTRACTED','EXCLUDED','RETRY_WAIT'] %}<option value="{{ value }}" {{ 'selected' if status == value }}>{{ value }}</option>{% endfor %}</select><button>검색</button></form>
+<section class="panel table-wrap"><table><thead><tr><th>메일</th><th>발신</th><th>스레드</th><th>현재 노드</th><th>상태</th></tr></thead><tbody>
+{% for event, mail in mails %}<tr><td><a href="/mails/{{ mail.message_id }}">{{ mail.subject }}</a><small class="mono">{{ mail.message_id }}</small></td><td>{{ mail.sender }}</td><td class="mono">{{ mail.thread_id }}</td><td>{{ event.current_node }}</td><td><span class="pill {{ event.status|lower }}">{{ event.status }}</span></td></tr>{% else %}<tr><td colspan="5" class="empty">수집된 메일이 없습니다.</td></tr>{% endfor %}
+</tbody></table></section>
+{% endblock %}

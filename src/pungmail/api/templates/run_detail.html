@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}실행 상세 · 풍멜이{% endblock %}
+{% block heading %}실행 상세{% endblock %}
+{% block content %}
+<section class="summary-strip"><div><span>워크플로</span><strong>{{ run.workflow_type }}</strong></div><div><span>트리거</span><strong>{{ run.trigger_type }}</strong></div><div><span>상태</span><strong class="pill {{ run.status|lower }}">{{ run.status }}</strong></div><div><span>시작</span><strong>{{ run.started_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</strong></div></section>
+<section class="panel"><div class="panel-head"><h2>노드 실행 내역</h2><span>{{ nodes|length }}건</span></div><div class="timeline">
+{% for node in nodes %}<article class="timeline-row {{ node.status|lower }}"><span class="timeline-dot"></span><div class="timeline-main"><div><strong>{{ node.node_key }}</strong>{% if node.branch_key %}<span class="branch-tag">{{ node.branch_key }}</span>{% endif %}</div><small>{{ node.started_at_utc.strftime('%H:%M:%S') if node.started_at_utc else '-' }} → {{ node.finished_at_utc.strftime('%H:%M:%S') if node.finished_at_utc else '-' }}</small>{% if node.error_message %}<p class="error-box">{{ node.error_type }} · {{ node.error_message }}</p>{% endif %}<details><summary>입출력 요약</summary><pre>{{ node.input_summary_json }}
+
+{{ node.output_summary_json }}</pre></details></div><span class="pill {{ node.status|lower }}">{{ node.status }}</span></article>{% else %}<div class="empty">노드 실행 기록이 없습니다.</div>{% endfor %}
+</div></section>
+{% endblock %}

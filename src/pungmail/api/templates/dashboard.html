@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}대시보드 · 풍멜이{% endblock %}
+{% block heading %}운영 대시보드{% endblock %}
+{% block content %}
+<section class="hero"><div><span class="pulse"></span> 메일 수집 플랫폼 상태</div><strong>다음 확인 예상 {{ next_mail.strftime('%H:%M:%S') }}</strong></section>
+<section class="metrics">
+  <article><span>24시간 실행</span><strong>{{ data.run_count }}</strong></article>
+  <article><span>정상 완료</span><strong class="success-text">{{ data.success_count }}</strong></article>
+  <article><span>확인 필요</span><strong class="danger-text">{{ data.failed_count }}</strong></article>
+  <article><span>대기 메일</span><strong>{{ data.pending_count }}</strong></article>
+  <article><span>수집 메일</span><strong>{{ data.mail_count }}</strong></article>
+</section>
+<section class="grid two">
+  <article class="panel">
+    <div class="panel-head"><h2>서비스 상태</h2><span>로컬 프로세스</span></div>
+    <div class="service-list">{% for name, service in services.items() %}<div><span class="status-dot {{ 'ok' if service.ok else 'off' }}"></span><strong>{{ name }}</strong><em>{{ service.status }}</em></div>{% endfor %}</div>
+  </article>
+  <article class="panel">
+    <div class="panel-head"><h2>최근 오류</h2><a href="/logs">전체 보기</a></div>
+    {% for error in data.recent_errors %}<a class="list-row" href="/runs/{{ error.workflow_run_id }}"><span><strong>{{ error.node_key }}</strong><small>{{ error.error_type }}</small></span><em>{{ error.finished_at_utc.strftime('%m/%d %H:%M') if error.finished_at_utc else '-' }}</em></a>{% else %}<div class="empty">최근 오류가 없습니다.</div>{% endfor %}
+  </article>
+</section>
+<section class="grid two">
+  <article class="panel">
+    <div class="panel-head"><h2>최근 실행</h2><a href="/runs">전체 보기</a></div>
+    {% for run in data.recent_runs %}<a class="list-row" href="/runs/{{ run.id }}"><span><strong>{{ '메일 처리' if run.workflow_type == 'mail_processing' else '오더시트·재고 갱신' }}</strong><small>{{ run.trigger_type }}</small></span><span class="pill {{ run.status|lower }}">{{ run.status }}</span></a>{% else %}<div class="empty">아직 실행 기록이 없습니다.</div>{% endfor %}
+  </article>
+  <article class="panel">
+    <div class="panel-head"><h2>최근 수집 메일</h2><a href="/mails">전체 보기</a></div>
+    {% for event, mail in data.recent_mails %}<a class="list-row" href="/mails/{{ mail.message_id }}"><span><strong>{{ mail.subject }}</strong><small>{{ mail.sender }}</small></span><span class="pill {{ event.status|lower }}">{{ event.status }}</span></a>{% else %}<div class="empty">아직 수집된 메일이 없습니다.</div>{% endfor %}
+  </article>
+</section>
+{% endblock %}
