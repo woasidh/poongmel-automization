@@ -14,6 +14,8 @@ def test_management_pages_render_observable_run(isolated_settings, monkeypatch) 
     enqueue_messages([{"id": "message-ui", "threadId": "thread-ui"}], run_id)
     with TrackedNode(run_id, "discover_gmail") as node:
         node.set_output({"discovered": 1})
+    with TrackedNode(run_id, "process_order_sources", branch_key="발주") as node:
+        node.set_output({"checked": True})
     finish_workflow_run(run_id, "SUCCEEDED", {"discovered": 1})
 
     app_module = import_module("pungmail.api.app")
@@ -33,7 +35,10 @@ def test_management_pages_render_observable_run(isolated_settings, monkeypatch) 
             ("메일 처리", "발주", "오더시트·재고표 확인", "오더", "RW·SI DB 처리", "보류"),
         ),
         ("/runs", ("실행 이력",)),
-        (f"/runs/{run_id}", ("discover_gmail",)),
+        (
+            f"/runs/{run_id}",
+            ("실행된 노드 흐름", "Gmail 증분 조회", "발주 DB·4종 근거 처리", "정상 완료"),
+        ),
         ("/mails", ("(수집 대기)",)),
         ("/mails/message-ui", ("message-ui",)),
     ):
@@ -41,3 +46,8 @@ def test_management_pages_render_observable_run(isolated_settings, monkeypatch) 
         assert response.status_code == 200
         for expected in expected_values:
             assert expected in response.text
+
+    run_response = client.get(f"/runs/{run_id}")
+    assert "discover_gmail" not in run_response.text
+    assert "enqueue_message" not in run_response.text
+    assert 'branch-column active' in run_response.text

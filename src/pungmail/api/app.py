@@ -29,6 +29,115 @@ from pungmail.workflows.graph import WORKFLOW_GRAPHS
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
 
+NODE_STATUS_LABELS = {
+    "PENDING": "실행 안 함",
+    "RUNNING": "실행 중",
+    "SUCCEEDED": "정상 완료",
+    "FAILED": "실패",
+    "RETRY_WAIT": "재시도 대기",
+    "SKIPPED": "건너뜀",
+}
+NODE_STATUS_PRIORITY = ("FAILED", "RETRY_WAIT", "RUNNING", "SUCCEEDED", "SKIPPED")
+WORKFLOW_LABELS = {
+    "mail_processing": "메일 처리",
+    "order_status_refresh": "오더시트·재고 갱신",
+}
+RUN_STATUS_LABELS = {
+    "PENDING": "대기",
+    "RUNNING": "실행 중",
+    "SUCCEEDED": "정상 완료",
+    "PARTIAL": "일부 실패",
+    "FAILED": "실패",
+}
+TRIGGER_LABELS = {
+    "SCHEDULED": "정기 실행",
+    "MANUAL": "수동 실행",
+    "RECOVERY": "복구 실행",
+    "TEST": "테스트",
+}
+
+
+def _build_run_graph(workflow_type: str, node_runs: list[Any]) -> dict[str, Any]:
+    definitions = WORKFLOW_GRAPHS.get(workflow_type, ())
+    records_by_key: dict[str, list[Any]] = {}
+    for record in node_runs:
+        records_by_key.setdefault(record.node_key, []).append(record)
+
+    nodes: list[dict[str, Any]] = []
+    for definition in definitions:
+        records = records_by_key.get(definition.key, [])
+        statuses = {record.status for record in records}
+        status = next(
+            (candidate for candidate in NODE_STATUS_PRIORITY if candidate in statuses),
+            "PENDING",
+        )
+        duration = sum(
+            max((record.finished_at_utc - record.started_at_utc).total_seconds(), 0)
+            for record in records
+            if record.started_at_utc and record.finished_at_utc
+        )
+        record_views = [
+            {
+                "status": record.status,
+                "status_label": NODE_STATUS_LABELS.get(record.status, record.status),
+                "time": (
+                    f"{record.started_at_utc.strftime('%H:%M:%S')} → "
+                    f"{record.finished_at_utc.strftime('%H:%M:%S') if record.finished_at_utc else '진행 중'}"
+                    if record.started_at_utc
+                    else "시각 기록 없음"
+                ),
+                "input": record.input_summary_json,
+                "output": record.output_summary_json,
+                "error": (
+                    f"{record.error_type} · {record.error_message}"
+                    if record.error_message
+                    else ""
+                ),
+            }
+            for record in records
+        ]
+        nodes.append(
+            {
+                "key": definition.key,
+                "label": definition.label,
+                "stage": definition.stage,
+                "branch": definition.branch,
+                "status": status,
+                "status_label": NODE_STATUS_LABELS[status],
+                "record_count": len(records),
+                "duration": f"{duration:.1f}초" if records else "기록 없음",
+                "records": record_views,
+                "error": next((view["error"] for view in record_views if view["error"]), ""),
+            }
+        )
+
+    tail_keys = {"render_discord", "dispatch_outbox", "finalize_case"}
+    common_nodes = [
+        node
+        for node in nodes
+        if node["stage"] == "common" and node["key"] not in tail_keys
+    ]
+    tail_nodes = [node for node in nodes if node["key"] in tail_keys]
+    router = next((node for node in nodes if node["stage"] == "router"), None)
+    branches: list[dict[str, Any]] = []
+    for node in nodes:
+        if not node["branch"]:
+            continue
+        branch = next((item for item in branches if item["name"] == node["branch"]), None)
+        if branch is None:
+            branch = {"name": node["branch"], "nodes": [], "active": False}
+            branches.append(branch)
+        branch["nodes"].append(node)
+        if node["status"] not in {"PENDING", "SKIPPED"}:
+            branch["active"] = True
+
+    return {
+        "common_nodes": common_nodes,
+        "router": router,
+        "branches": branches,
+        "tail_nodes": tail_nodes,
+    }
+
 
 def _read_text(settings: Settings, stored_path: str | None, limit: int = 250_000) -> str:
     if not stored_path:
@@ -133,7 +242,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         run, nodes = get_run(run_id)
         if run is None:
             raise HTTPException(status_code=404, detail="run not found")
-        return templates.TemplateResponse(request, "run_detail.html", context(request, run=run, nodes=nodes))
+        return templates.TemplateResponse(
+            request,
+            "run_detail.html",
+            context(
+                request,
+                run=run,
+                workflow_name=WORKFLOW_LABELS.get(run.workflow_type, run.workflow_type),
+                run_status_label=RUN_STATUS_LABELS.get(run.status, run.status),
+                trigger_label=TRIGGER_LABELS.get(run.trigger_type, run.trigger_type),
+                graph=_build_run_graph(run.workflow_type, nodes),
+                node_record_count=len(nodes),
+            ),
+        )
 
     @application.get("/mails", response_class=HTMLResponse)
     def mails_page(request: Request, status: str = "", q: str = Query(default="", max_length=120)) -> HTMLResponse:

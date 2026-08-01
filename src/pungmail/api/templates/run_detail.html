@@ -1,11 +1,81 @@
 {% extends "base.html" %}
 {% block title %}실행 상세 · 풍멜이{% endblock %}
 {% block heading %}실행 상세{% endblock %}
-{% block content %}
-<section class="summary-strip"><div><span>워크플로</span><strong>{{ run.workflow_type }}</strong></div><div><span>트리거</span><strong>{{ run.trigger_type }}</strong></div><div><span>상태</span><strong class="pill {{ run.status|lower }}">{{ run.status }}</strong></div><div><span>시작</span><strong>{{ run.started_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</strong></div></section>
-<section class="panel"><div class="panel-head"><h2>노드 실행 내역</h2><span>{{ nodes|length }}건</span></div><div class="timeline">
-{% for node in nodes %}<article class="timeline-row {{ node.status|lower }}"><span class="timeline-dot"></span><div class="timeline-main"><div><strong>{{ node.node_key }}</strong>{% if node.branch_key %}<span class="branch-tag">{{ node.branch_key }}</span>{% endif %}</div><small>{{ node.started_at_utc.strftime('%H:%M:%S') if node.started_at_utc else '-' }} → {{ node.finished_at_utc.strftime('%H:%M:%S') if node.finished_at_utc else '-' }}</small>{% if node.error_message %}<p class="error-box">{{ node.error_type }} · {{ node.error_message }}</p>{% endif %}<details><summary>입출력 요약</summary><pre>{{ node.input_summary_json }}
 
-{{ node.output_summary_json }}</pre></details></div><span class="pill {{ node.status|lower }}">{{ node.status }}</span></article>{% else %}<div class="empty">노드 실행 기록이 없습니다.</div>{% endfor %}
-</div></section>
+{% macro node_card(node, extra_class='') %}
+<article class="flow-node run-flow-node status-{{ node.status|lower }} {{ extra_class }}">
+  <div class="run-node-head">
+    <span class="run-node-state"><i></i>{{ node.status_label }}</span>
+    {% if node.record_count > 1 %}<em>{{ node.record_count }}건</em>{% endif %}
+  </div>
+  <strong>{{ node.label }}</strong>
+  <small>{{ node.duration }}</small>
+  {% if node.error %}<p class="run-node-error">{{ node.error }}</p>{% endif %}
+  {% if node.records %}
+  <details class="run-node-details">
+    <summary>실행 기록 보기</summary>
+    {% for record in node.records %}
+    <div class="run-node-record">
+      <b>{{ loop.index }}번째 · {{ record.status_label }}</b>
+      <span>{{ record.time }}</span>
+      {% if record.error %}<p>{{ record.error }}</p>{% endif %}
+      <pre>입력
+{{ record.input }}
+
+출력
+{{ record.output }}</pre>
+    </div>
+    {% endfor %}
+  </details>
+  {% endif %}
+</article>
+{% endmacro %}
+
+{% block content %}
+<section class="summary-strip">
+  <div><span>워크플로</span><strong>{{ workflow_name }}</strong></div>
+  <div><span>실행 방식</span><strong>{{ trigger_label }}</strong></div>
+  <div><span>전체 결과</span><strong class="pill {{ run.status|lower }}">{{ run_status_label }}</strong></div>
+  <div><span>시작</span><strong>{{ run.started_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</strong></div>
+</section>
+
+<section class="panel run-graph-panel">
+  <div class="panel-head"><h2>실행된 노드 흐름</h2><span>실행 기록 {{ node_record_count }}건</span></div>
+  <div class="run-legend" aria-label="노드 상태 범례">
+    <span class="status-succeeded"><i></i>정상 완료</span>
+    <span class="status-running"><i></i>실행 중</span>
+    <span class="status-failed"><i></i>실패</span>
+    <span class="status-retry_wait"><i></i>재시도 대기</span>
+    <span class="status-skipped"><i></i>건너뜀</span>
+    <span class="status-pending"><i></i>실행 안 함</span>
+  </div>
+
+  <div class="flow-rows run-flow-rows">
+    {% for row in graph.common_nodes|batch(4) %}
+    <div class="common-flow">{% for node in row %}{{ node_card(node) }}{% endfor %}</div>
+    {% if not loop.last %}<div class="flow-down" aria-hidden="true">↓</div>{% endif %}
+    {% endfor %}
+  </div>
+
+  {% if graph.router %}
+  <div class="run-router-wrap">{{ node_card(graph.router, 'run-router-node') }}</div>
+  {% endif %}
+
+  {% if graph.branches %}
+  <div class="branch-grid run-branch-grid">
+    {% for branch in graph.branches %}
+    <section class="branch-column {{ 'active' if branch.active else '' }}">
+      <h3>{{ branch.name }}</h3>
+      {% for node in branch.nodes %}{{ node_card(node, 'branch') }}{% endfor %}
+    </section>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if graph.tail_nodes %}
+  <div class="common-flow tail run-tail">
+    {% for node in graph.tail_nodes %}{{ node_card(node) }}{% endfor %}
+  </div>
+  {% endif %}
+</section>
 {% endblock %}
