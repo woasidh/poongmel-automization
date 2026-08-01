@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 from sqlalchemy import select
@@ -9,7 +11,12 @@ from sqlalchemy import select
 from pungmail.adapters.catalog import CompanyCatalog
 from pungmail.adapters.openai_decision import OpenAIMailDecisionClient
 from pungmail.config import Settings, get_settings
-from pungmail.domain.decisions import MailDecision
+from pungmail.domain.decisions import (
+    Category,
+    MailDecision,
+    OrderPayload,
+    UpstreamOrderPayload,
+)
 from pungmail.prompts import build_prompt_bundle
 from pungmail.repositories.ai_store import save_ai_failure, save_ai_success
 from pungmail.repositories.database import session_scope
@@ -21,6 +28,7 @@ from pungmail.repositories.models import (
 
 
 AI_ATTACHMENT_TEXT_LIMIT = 12_000
+RICHWOOD_DOMAIN = "richwood.net"
 
 
 def _read(settings: Settings, stored_path: str | None, limit: int = 200_000) -> str:
@@ -135,6 +143,109 @@ def catalog_candidates_for_evidence(
     ]
 
 
+def _upstream_rw_numbers(
+    decision: MailDecision,
+    evidence: dict[str, Any],
+) -> list[str]:
+    values = [*decision.case_lookup_keys.rw_numbers]
+    payload = decision.category_payload
+    if isinstance(payload, OrderPayload):
+        values.extend(payload.po_numbers)
+    text = "\n".join(
+        str(message.get(key) or "")
+        for message in evidence.get("messages", [])
+        for key in ("subject", "actual_body")
+    )
+    text += "\n" + "\n".join(
+        str(attachment.get("extracted_text") or "")
+        for attachment in evidence.get("attachments", [])
+    )
+    values.extend(f"RW-{number}" for number in re.findall(r"\bRW\s*[-_]?\s*(\d{3,})\b", text, re.I))
+    values.extend(
+        f"RW-{number}"
+        for number in re.findall(r"\[RICHWOOD\].*?\bPO\s*[-_]?\s*(\d{3,})\b", text, re.I)
+    )
+    normalized: list[str] = []
+    for value in values:
+        match = re.search(r"(?:RW|PO)\s*[-_]?\s*(\d{3,})", value, re.I)
+        candidate = f"RW-{match.group(1)}" if match else value.strip()
+        if candidate and candidate.casefold() not in {item.casefold() for item in normalized}:
+            normalized.append(candidate)
+    return normalized
+
+
+def apply_direction_guards(
+    decision: MailDecision,
+    evidence: dict[str, Any],
+) -> MailDecision:
+    """명확한 발신 방향 근거가 AI 분류와 충돌하면 업무 방향을 보정한다."""
+    if decision.category != Category.ORDER or not isinstance(
+        decision.category_payload, OrderPayload
+    ):
+        return decision
+    messages = evidence.get("messages", [])
+    if not messages:
+        return decision
+    first = messages[0]
+    sender = str(first.get("sender_email") or "").casefold()
+    recipients = [
+        str(value).casefold()
+        for value in [*(first.get("recipients") or []), *(first.get("cc") or [])]
+    ]
+    if not sender.endswith(f"@{RICHWOOD_DOMAIN}"):
+        return decision
+    if not any(
+        "@" in address and not address.endswith(f"@{RICHWOOD_DOMAIN}")
+        for address in recipients
+    ):
+        return decision
+    attachment_text = "\n".join(
+        str(attachment.get("extracted_text") or "")
+        for attachment in evidence.get("attachments", [])
+    )
+    first_text = "\n".join(
+        str(first.get(key) or "") for key in ("subject", "actual_body")
+    )
+    rw_numbers = _upstream_rw_numbers(decision, evidence)
+    explicit_purchase_order = "purchase order" in attachment_text.casefold()
+    richwood_is_document_sender = bool(
+        re.search(r"\bFROM\s*:\s*RICHWOOD\b", attachment_text, re.I)
+    )
+    po_request = bool(
+        re.search(r"\[RICHWOOD\].*?\bPO\s*[-_]?\s*\d{3,}", first_text, re.I)
+    )
+    if not rw_numbers or not (po_request or explicit_purchase_order and richwood_is_document_sender):
+        return decision
+
+    payload = decision.category_payload
+    remaining_po_numbers = [
+        value
+        for value in payload.po_numbers
+        if not re.search(r"(?:RW|PO)\s*[-_]?\s*\d{3,}", value, re.I)
+    ]
+    lookup_keys = decision.case_lookup_keys.model_copy(
+        update={
+            "po_numbers": remaining_po_numbers,
+            "rw_numbers": rw_numbers,
+        }
+    )
+    upstream_payload = UpstreamOrderPayload(
+        payload_type="UPSTREAM_ORDER",
+        rw_numbers=rw_numbers,
+        si_numbers=decision.case_lookup_keys.si_numbers,
+        items=payload.items,
+        status_text=None,
+        notes=payload.notes,
+    )
+    return decision.model_copy(
+        update={
+            "category": Category.UPSTREAM_ORDER,
+            "case_lookup_keys": lookup_keys,
+            "category_payload": upstream_payload,
+        }
+    )
+
+
 def failure_hold_decision(
     evidence: dict[str, Any],
     error: Exception,
@@ -186,6 +297,7 @@ def decide_mail(
     active = settings or get_settings()
     try:
         result = (client or OpenAIMailDecisionClient(active)).decide(evidence, candidates)
+        result = replace(result, decision=apply_direction_guards(result.decision, evidence))
         decision_id = save_ai_success(
             mail_event_id,
             result,
