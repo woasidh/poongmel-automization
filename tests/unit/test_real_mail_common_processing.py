@@ -106,3 +106,107 @@ def test_outgoing_richwood_purchase_order_is_forced_to_upstream_order() -> None:
     assert guarded.category_payload.payload_type == "UPSTREAM_ORDER"
     assert guarded.category_payload.rw_numbers == ["RW-22619"]
     assert guarded.case_lookup_keys.po_numbers == []
+
+
+def test_external_customer_document_request_is_not_punglim_supplier_request() -> None:
+    decision = MailDecision.model_validate(
+        {
+            "category": "풍림자료요청",
+            "case_action": "CREATE",
+            "case_lookup_keys": {
+                "original_message_id": "message-2",
+                "thread_id": "thread-2",
+                "company_key": "cosmax",
+                "po_numbers": [],
+                "rw_numbers": [],
+                "si_numbers": [],
+                "item_component_keys": [],
+            },
+            "company": "COSMAX",
+            "subject": "원료 MSDS 문의",
+            "summary": "고객의 MSDS 요청",
+            "missing_fields": [],
+            "evidence_refs": ["gmail:message-2"],
+            "category_payload": {
+                "payload_type": "PUNGLIM_DOCUMENT",
+                "items": [],
+                "components": [
+                    {
+                        "component_type": "DOCUMENT",
+                        "label": "English MSDS",
+                        "completed": False,
+                        "evidence_ref": None,
+                    }
+                ],
+                "supplier_route": "nikko",
+                "recipient": None,
+                "contact": None,
+            },
+        }
+    )
+    evidence = {
+        "messages": [
+            {
+                "sender_email": "requester@customer.example",
+                "recipients": ["staff@richwood.net"],
+                "cc": [],
+                "subject": "원료 MSDS 문의",
+                "actual_body": "최신 영문 MSDS 전달 부탁드립니다.",
+            }
+        ],
+        "attachments": [],
+    }
+
+    guarded = apply_direction_guards(decision, evidence)
+
+    assert guarded.category.value == "샘플자료견적"
+    assert guarded.category_payload.payload_type == "SAMPLE_DOCUMENT_QUOTE"
+    assert guarded.category_payload.components[0].label == "English MSDS"
+
+
+def test_upstream_order_identifier_is_recovered_from_real_evidence() -> None:
+    decision = MailDecision.model_validate(
+        {
+            "category": "오더",
+            "case_action": "CREATE",
+            "case_lookup_keys": {
+                "original_message_id": "message-3",
+                "thread_id": "thread-3",
+                "company_key": "seiwa",
+                "po_numbers": [],
+                "rw_numbers": [],
+                "si_numbers": [],
+                "item_component_keys": [],
+            },
+            "company": "SEIWA",
+            "subject": "[RICHWOOD] PO22619 request",
+            "summary": "상류 공급사 주문",
+            "missing_fields": [],
+            "evidence_refs": ["gmail:message-3"],
+            "category_payload": {
+                "payload_type": "UPSTREAM_ORDER",
+                "rw_numbers": [],
+                "si_numbers": [],
+                "items": [],
+                "status_text": None,
+                "notes": [],
+            },
+        }
+    )
+    evidence = {
+        "messages": [
+            {
+                "sender_email": "staff@richwood.net",
+                "recipients": ["supplier@example.jp"],
+                "cc": [],
+                "subject": "[RICHWOOD] PO22619 request",
+                "actual_body": "Please see attached PO.",
+            }
+        ],
+        "attachments": [{"extracted_text": "PURCHASE ORDER RW-22619"}],
+    }
+
+    guarded = apply_direction_guards(decision, evidence)
+
+    assert guarded.category_payload.rw_numbers == ["RW-22619"]
+    assert guarded.case_lookup_keys.rw_numbers == ["RW-22619"]

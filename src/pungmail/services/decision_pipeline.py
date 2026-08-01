@@ -15,6 +15,8 @@ from pungmail.domain.decisions import (
     Category,
     MailDecision,
     OrderPayload,
+    PunglimDocumentRequestPayload,
+    SampleDocumentQuotePayload,
     UpstreamOrderPayload,
 )
 from pungmail.prompts import build_prompt_bundle
@@ -151,6 +153,8 @@ def _upstream_rw_numbers(
     payload = decision.category_payload
     if isinstance(payload, OrderPayload):
         values.extend(payload.po_numbers)
+    elif isinstance(payload, UpstreamOrderPayload):
+        values.extend(payload.rw_numbers)
     text = "\n".join(
         str(message.get(key) or "")
         for message in evidence.get("messages", [])
@@ -179,10 +183,6 @@ def apply_direction_guards(
     evidence: dict[str, Any],
 ) -> MailDecision:
     """명확한 발신 방향 근거가 AI 분류와 충돌하면 업무 방향을 보정한다."""
-    if decision.category != Category.ORDER or not isinstance(
-        decision.category_payload, OrderPayload
-    ):
-        return decision
     messages = evidence.get("messages", [])
     if not messages:
         return decision
@@ -192,12 +192,60 @@ def apply_direction_guards(
         str(value).casefold()
         for value in [*(first.get("recipients") or []), *(first.get("cc") or [])]
     ]
-    if not sender.endswith(f"@{RICHWOOD_DOMAIN}"):
-        return decision
-    if not any(
+    sender_is_richwood = sender.endswith(f"@{RICHWOOD_DOMAIN}")
+    has_richwood_recipient = any(
+        address.endswith(f"@{RICHWOOD_DOMAIN}") for address in recipients
+    )
+    has_external_recipient = any(
         "@" in address and not address.endswith(f"@{RICHWOOD_DOMAIN}")
         for address in recipients
+    )
+
+    if decision.category == Category.UPSTREAM_ORDER and isinstance(
+        decision.category_payload, UpstreamOrderPayload
     ):
+        rw_numbers = _upstream_rw_numbers(decision, evidence)
+        if not rw_numbers:
+            return decision
+        lookup_keys = decision.case_lookup_keys.model_copy(
+            update={"rw_numbers": rw_numbers}
+        )
+        payload = decision.category_payload.model_copy(
+            update={"rw_numbers": rw_numbers}
+        )
+        return decision.model_copy(
+            update={"case_lookup_keys": lookup_keys, "category_payload": payload}
+        )
+
+    if decision.category == Category.PUNGLIM_DOCUMENT and isinstance(
+        decision.category_payload, PunglimDocumentRequestPayload
+    ):
+        if sender_is_richwood or not has_richwood_recipient:
+            return decision
+        payload = decision.category_payload
+        customer_payload = SampleDocumentQuotePayload(
+            payload_type="SAMPLE_DOCUMENT_QUOTE",
+            items=payload.items,
+            components=payload.components,
+            end_user=None,
+            destination=None,
+            recipient=payload.recipient,
+            contact=payload.contact,
+        )
+        return decision.model_copy(
+            update={
+                "category": Category.SAMPLE_DOCUMENT_QUOTE,
+                "category_payload": customer_payload,
+            }
+        )
+
+    if decision.category != Category.ORDER or not isinstance(
+        decision.category_payload, OrderPayload
+    ):
+        return decision
+    if not sender_is_richwood:
+        return decision
+    if not has_external_recipient:
         return decision
     attachment_text = "\n".join(
         str(attachment.get("extracted_text") or "")
