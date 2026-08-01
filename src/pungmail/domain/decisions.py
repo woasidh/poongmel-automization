@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -50,6 +51,28 @@ class RequestComponentInput(StrictModel):
     evidence_ref: str | None
 
 
+def _deduplicate_components(
+    components: list[RequestComponentInput],
+) -> list[RequestComponentInput]:
+    """동일 요청 항목은 완료 근거가 있는 최신 상태 하나로 합친다."""
+    merged: dict[tuple[str, str], RequestComponentInput] = {}
+    order: list[tuple[str, str]] = []
+    for component in components:
+        label_key = re.sub(r"\s+", " ", component.label).strip().casefold()
+        key = (component.component_type, label_key)
+        current = merged.get(key)
+        if current is None:
+            merged[key] = component
+            order.append(key)
+            continue
+        if component.completed and not current.completed:
+            merged[key] = component
+        elif component.completed == current.completed:
+            if not current.evidence_ref and component.evidence_ref:
+                merged[key] = component
+    return [merged[key] for key in order]
+
+
 class OrderPayload(StrictModel):
     payload_type: Literal["ORDER"]
     po_numbers: list[str]
@@ -76,6 +99,11 @@ class SampleDocumentQuotePayload(StrictModel):
     recipient: str | None
     contact: str | None
 
+    @model_validator(mode="after")
+    def merge_duplicate_components(self) -> SampleDocumentQuotePayload:
+        self.components = _deduplicate_components(self.components)
+        return self
+
 
 class PunglimDocumentRequestPayload(StrictModel):
     payload_type: Literal["PUNGLIM_DOCUMENT"]
@@ -84,6 +112,11 @@ class PunglimDocumentRequestPayload(StrictModel):
     supplier_route: Literal["nikko", "seiwa", "기타"] | None
     recipient: str | None
     contact: str | None
+
+    @model_validator(mode="after")
+    def merge_duplicate_components(self) -> PunglimDocumentRequestPayload:
+        self.components = _deduplicate_components(self.components)
+        return self
 
 
 class InternalWorkPayload(StrictModel):

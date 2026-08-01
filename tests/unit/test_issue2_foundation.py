@@ -75,12 +75,40 @@ def test_prompt_manifest_is_deterministic_and_complete() -> None:
     first = build_prompt_bundle()
     second = build_prompt_bundle()
     assert first.sha256 == second.sha256
-    assert first.version == "issue2-real-v2"
+    assert first.version == "issue2-real-v3"
     assert len(first.files) == 9
     assert all(len(item.sha256) == 64 for item in first.files)
     assert "메일 한 건" in first.content
     assert "최초 주문 방향은 바뀌지 않는다" in first.content
     assert "해외업무보다 풍림자료요청을 우선" in first.content
+    assert "고객이 시작한 업무 방향은 바뀌지 않는다" in first.content
+
+
+def test_duplicate_request_components_keep_completed_evidence() -> None:
+    payload = sample_decision()
+    category_payload = payload["category_payload"]
+    assert isinstance(category_payload, dict)
+    category_payload["components"] = [
+        {
+            "component_type": "DOCUMENT",
+            "label": "English MSDS",
+            "completed": False,
+            "evidence_ref": None,
+        },
+        {
+            "component_type": "DOCUMENT",
+            "label": "  English   MSDS  ",
+            "completed": True,
+            "evidence_ref": "attachment:msds",
+        },
+    ]
+
+    decision = MailDecision.model_validate(payload)
+    components = decision.category_payload.components
+
+    assert len(components) == 1
+    assert components[0].completed is True
+    assert components[0].evidence_ref == "attachment:msds"
 
 
 def test_company_catalog_retains_duplicates_and_hides_deleted() -> None:

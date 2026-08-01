@@ -5,7 +5,7 @@ from hashlib import sha256
 from importlib.resources import files
 
 
-PROMPT_VERSION = "issue2-real-v2"
+PROMPT_VERSION = "issue2-real-v3"
 PROMPT_ORDER = (
     "common.md",
     "classification.md",
