@@ -12,10 +12,13 @@ from pungmail.adapters.catalog import CompanyCatalog
 from pungmail.adapters.openai_decision import OpenAIMailDecisionClient
 from pungmail.config import Settings, get_settings
 from pungmail.domain.decisions import (
+    CatalogItemInput,
     Category,
+    InternalWorkPayload,
     MailDecision,
     OrderPayload,
     PunglimDocumentRequestPayload,
+    RequestComponentInput,
     SampleDocumentQuotePayload,
     UpstreamOrderPayload,
 )
@@ -178,6 +181,93 @@ def _upstream_rw_numbers(
     return normalized
 
 
+def _document_request_components(
+    evidence: dict[str, Any],
+) -> list[RequestComponentInput]:
+    messages = evidence.get("messages", [])
+    if not messages:
+        return []
+    first = messages[0]
+    first_message_id = str(first.get("message_id") or "")
+    body = str(first.get("actual_body") or "")
+    labels = [
+        re.sub(r"\s+", " ", match).strip()
+        for match in re.findall(r"^\s*[\-*•]\s+(.+?)\s*$", body, re.M)
+    ]
+    if not labels:
+        return []
+    aliases = {
+        "reach": ("reach",),
+        "non-animal": ("animaltest", "nonanimal"),
+        "bse": ("bse",),
+        "california proposition 65": ("caprop65", "proposition65"),
+        "cmr": ("cmr",),
+        "iso 16128": ("iso16128",),
+        "gluten": ("gluten",),
+        "cites": ("cites",),
+    }
+    completed_attachments = [
+        attachment
+        for attachment in evidence.get("attachments", [])
+        if str(attachment.get("message_id") or "") != first_message_id
+    ]
+    components: list[RequestComponentInput] = []
+    for label in labels:
+        label_key = re.sub(r"[^a-z0-9]+", "", label.casefold())
+        expected_tokens = tuple(
+            token
+            for phrase, tokens in aliases.items()
+            if re.sub(r"[^a-z0-9]+", "", phrase) in label_key
+            for token in tokens
+        )
+        matched = next(
+            (
+                attachment
+                for attachment in completed_attachments
+                if expected_tokens
+                and any(
+                    token
+                    in re.sub(
+                        r"[^a-z0-9]+",
+                        "",
+                        str(attachment.get("file_name") or "").casefold(),
+                    )
+                    for token in expected_tokens
+                )
+            ),
+            None,
+        )
+        components.append(
+            RequestComponentInput(
+                component_type="DOCUMENT",
+                label=label,
+                completed=matched is not None,
+                evidence_ref=str(matched.get("ref")) if matched else None,
+            )
+        )
+    return components
+
+
+def _document_request_item(subject: str) -> CatalogItemInput | None:
+    match = re.search(
+        r"\[RICHWOOD\]\s*(.+?)\s+documents?\s+request\b",
+        subject,
+        re.I,
+    )
+    if not match:
+        return None
+    name = re.sub(r"\s+", " ", match.group(1)).strip()
+    if not name:
+        return None
+    return CatalogItemInput(
+        raw_product_name=name,
+        item_code=None,
+        spec=None,
+        quantity=None,
+        unit=None,
+    )
+
+
 def apply_direction_guards(
     decision: MailDecision,
     evidence: dict[str, Any],
@@ -238,6 +328,58 @@ def apply_direction_guards(
                 "category_payload": customer_payload,
             }
         )
+
+    if decision.category == Category.INTERNAL_WORK and isinstance(
+        decision.category_payload, InternalWorkPayload
+    ):
+        first_text = "\n".join(
+            str(first.get(key) or "") for key in ("subject", "actual_body")
+        )
+        asks_supplier_for_documents = bool(
+            re.search(r"\bdocuments?\s+request\b", first_text, re.I)
+            or re.search(r"\b(?:MSDS|SDS)\b.*\brequest\b", first_text, re.I | re.S)
+        )
+        if sender_is_richwood and has_external_recipient and asks_supplier_for_documents:
+            item = _document_request_item(str(first.get("subject") or ""))
+            components = _document_request_components(evidence)
+            if item and components:
+                completed_refs = [
+                    component.evidence_ref
+                    for component in components
+                    if component.evidence_ref
+                ]
+                supplier_payload = PunglimDocumentRequestPayload(
+                    payload_type="PUNGLIM_DOCUMENT",
+                    items=[item],
+                    components=components,
+                    supplier_route="기타",
+                    recipient=next(
+                        (
+                            address
+                            for address in first.get("recipients", [])
+                            if not str(address).casefold().endswith(
+                                f"@{RICHWOOD_DOMAIN}"
+                            )
+                        ),
+                        None,
+                    ),
+                    contact=None,
+                )
+                return decision.model_copy(
+                    update={
+                        "category": Category.PUNGLIM_DOCUMENT,
+                        "category_payload": supplier_payload,
+                        "evidence_refs": list(
+                            dict.fromkeys(
+                                [
+                                    *decision.evidence_refs,
+                                    f"gmail:{first.get('message_id')}",
+                                    *completed_refs,
+                                ]
+                            )
+                        ),
+                    }
+                )
 
     if decision.category != Category.ORDER or not isinstance(
         decision.category_payload, OrderPayload

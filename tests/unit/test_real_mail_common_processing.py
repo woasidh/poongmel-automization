@@ -210,3 +210,74 @@ def test_upstream_order_identifier_is_recovered_from_real_evidence() -> None:
 
     assert guarded.category_payload.rw_numbers == ["RW-22619"]
     assert guarded.case_lookup_keys.rw_numbers == ["RW-22619"]
+
+
+def test_outgoing_supplier_document_request_is_not_generic_internal_work() -> None:
+    decision = MailDecision.model_validate(
+        {
+            "category": "사내업무",
+            "case_action": "CREATE",
+            "case_lookup_keys": {
+                "original_message_id": "message-4",
+                "thread_id": "thread-4",
+                "company_key": None,
+                "po_numbers": [],
+                "rw_numbers": [],
+                "si_numbers": [],
+                "item_component_keys": [],
+            },
+            "company": "NIKKOL",
+            "subject": "[RICHWOOD] SELACHYL ALCOHOL V documents request",
+            "summary": "공급사 자료 요청",
+            "missing_fields": [],
+            "evidence_refs": ["gmail:message-4"],
+            "category_payload": {
+                "payload_type": "INTERNAL_WORK",
+                "assignee": None,
+                "request_detail": "REACH 등 공급사 자료 요청",
+                "due_date": None,
+            },
+        }
+    )
+    evidence = {
+        "messages": [
+            {
+                "message_id": "message-4",
+                "sender_email": "staff@richwood.net",
+                "recipients": ["supplier@nikkolgroup.com"],
+                "cc": ["cosmetics@richwood.net"],
+                "subject": "[RICHWOOD] SELACHYL ALCOHOL V documents request",
+                "actual_body": (
+                    "Please provide the following documents:\n"
+                    "* REACH Statement\n"
+                    "* BSE Free Statement\n"
+                ),
+            },
+            {
+                "message_id": "supplier-reply",
+                "sender_email": "supplier@nikkolgroup.com",
+                "recipients": ["staff@richwood.net"],
+                "cc": [],
+                "subject": "Re: documents request",
+                "actual_body": "Attached REACH statement.",
+            },
+        ],
+        "attachments": [
+            {
+                "ref": "attachment:reach",
+                "message_id": "supplier-reply",
+                "file_name": "SELACHYL_ALCOHOL_V_reach.pdf",
+                "extracted_text": "",
+            }
+        ],
+    }
+
+    guarded = apply_direction_guards(decision, evidence)
+
+    assert guarded.category.value == "풍림자료요청"
+    assert guarded.category_payload.payload_type == "PUNGLIM_DOCUMENT"
+    assert guarded.category_payload.items[0].raw_product_name == "SELACHYL ALCOHOL V"
+    assert [component.completed for component in guarded.category_payload.components] == [
+        True,
+        False,
+    ]
