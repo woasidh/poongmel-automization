@@ -290,6 +290,60 @@ def apply_direction_guards(
         for address in recipients
     )
 
+    first_text = "\n".join(
+        str(first.get(key) or "") for key in ("subject", "actual_body")
+    )
+    asks_supplier_for_documents = bool(
+        re.search(r"\bdocuments?\s+request\b", first_text, re.I)
+        or re.search(r"\b(?:MSDS|SDS)\b.*\brequest\b", first_text, re.I | re.S)
+    )
+    if (
+        decision.category != Category.PUNGLIM_DOCUMENT
+        and sender_is_richwood
+        and has_external_recipient
+        and asks_supplier_for_documents
+    ):
+        item = _document_request_item(str(first.get("subject") or ""))
+        components = _document_request_components(evidence)
+        if item and components:
+            completed_refs = [
+                component.evidence_ref
+                for component in components
+                if component.evidence_ref
+            ]
+            supplier_payload = PunglimDocumentRequestPayload(
+                payload_type="PUNGLIM_DOCUMENT",
+                items=[item],
+                components=components,
+                supplier_route="기타",
+                recipient=next(
+                    (
+                        address
+                        for address in first.get("recipients", [])
+                        if not str(address).casefold().endswith(
+                            f"@{RICHWOOD_DOMAIN}"
+                        )
+                    ),
+                    None,
+                ),
+                contact=None,
+            )
+            return decision.model_copy(
+                update={
+                    "category": Category.PUNGLIM_DOCUMENT,
+                    "category_payload": supplier_payload,
+                    "evidence_refs": list(
+                        dict.fromkeys(
+                            [
+                                *decision.evidence_refs,
+                                f"gmail:{first.get('message_id')}",
+                                *completed_refs,
+                            ]
+                        )
+                    ),
+                }
+            )
+
     if decision.category == Category.UPSTREAM_ORDER and isinstance(
         decision.category_payload, UpstreamOrderPayload
     ):
@@ -327,60 +381,6 @@ def apply_direction_guards(
                 "category_payload": customer_payload,
             }
         )
-
-    if decision.category in (
-        Category.INTERNAL_WORK,
-        Category.OVERSEAS_WORK,
-        Category.HOLD,
-    ):
-        first_text = "\n".join(
-            str(first.get(key) or "") for key in ("subject", "actual_body")
-        )
-        asks_supplier_for_documents = bool(
-            re.search(r"\bdocuments?\s+request\b", first_text, re.I)
-            or re.search(r"\b(?:MSDS|SDS)\b.*\brequest\b", first_text, re.I | re.S)
-        )
-        if sender_is_richwood and has_external_recipient and asks_supplier_for_documents:
-            item = _document_request_item(str(first.get("subject") or ""))
-            components = _document_request_components(evidence)
-            if item and components:
-                completed_refs = [
-                    component.evidence_ref
-                    for component in components
-                    if component.evidence_ref
-                ]
-                supplier_payload = PunglimDocumentRequestPayload(
-                    payload_type="PUNGLIM_DOCUMENT",
-                    items=[item],
-                    components=components,
-                    supplier_route="기타",
-                    recipient=next(
-                        (
-                            address
-                            for address in first.get("recipients", [])
-                            if not str(address).casefold().endswith(
-                                f"@{RICHWOOD_DOMAIN}"
-                            )
-                        ),
-                        None,
-                    ),
-                    contact=None,
-                )
-                return decision.model_copy(
-                    update={
-                        "category": Category.PUNGLIM_DOCUMENT,
-                        "category_payload": supplier_payload,
-                        "evidence_refs": list(
-                            dict.fromkeys(
-                                [
-                                    *decision.evidence_refs,
-                                    f"gmail:{first.get('message_id')}",
-                                    *completed_refs,
-                                ]
-                            )
-                        ),
-                    }
-                )
 
     if decision.category != Category.ORDER or not isinstance(
         decision.category_payload, OrderPayload
