@@ -12,13 +12,13 @@ class GraphNode:
 
 
 MAIL_GRAPH: tuple[GraphNode, ...] = (
-    GraphNode("discover_gmail", "Gmail 증분 조회", "common"),
+    GraphNode("discover_gmail", "지메일 새 메일 조회", "common"),
     GraphNode("enqueue_message", "후보 메일 대기열 등록", "common"),
     GraphNode("validate_scope", "대상 범위 확인", "common"),
     GraphNode("collect_thread", "전체 스레드·첨부 수집", "common"),
-    GraphNode("extract_evidence", "본문·첨부·OCR 근거 추출", "common"),
+    GraphNode("extract_evidence", "본문·첨부·문자인식 근거 추출", "common"),
     GraphNode("lookup_catalog", "회사 품목 후보 조회", "common"),
-    GraphNode("classify_and_extract", "AI 분류·업무값 추출", "common"),
+    GraphNode("classify_and_extract", "인공지능 분류·업무값 추출", "common"),
     GraphNode("resolve_case", "기존 업무 찾기 또는 신규 업무 생성", "common"),
     GraphNode("route_category", "카테고리별 처리 분기", "router"),
     GraphNode("process_order_sources", "발주 기본정보 구조화", "branch", "발주"),
@@ -30,8 +30,8 @@ MAIL_GRAPH: tuple[GraphNode, ...] = (
     GraphNode("process_internal_work", "사내 업무 처리", "branch", "사내업무"),
     GraphNode("process_overseas_work", "해외 업무 처리", "branch", "해외업무"),
     GraphNode("process_hold", "보류 처리", "branch", "보류"),
-    GraphNode("render_discord", "Discord 카드 만들기", "common"),
-    GraphNode("dispatch_outbox", "Discord 알림 반영", "common"),
+    GraphNode("render_discord", "디스코드 카드 만들기", "common"),
+    GraphNode("dispatch_outbox", "디스코드 알림 반영", "common"),
     GraphNode("finalize_case", "결과·상태·이력 확정", "common"),
 )
 

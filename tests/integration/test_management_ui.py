@@ -32,12 +32,22 @@ def test_management_pages_render_observable_run(isolated_settings, monkeypatch) 
         ("/", ("운영 대시보드",)),
         (
             "/workflows/mail_processing",
-            ("메일 처리", "발주", "오더시트·재고표 확인", "오더", "RW·SI 기본정보 구조화", "보류"),
+            (
+                "메일 처리",
+                "지메일 새 메일 조회",
+                "인공지능 분류·업무값 추출",
+                "공통 처리",
+                "발주 분기",
+                "오더시트·재고표 확인",
+                "오더",
+                "RW·SI 기본정보 구조화",
+                "보류",
+            ),
         ),
         ("/runs", ("실행 이력",)),
         (
             f"/runs/{run_id}",
-            ("실행된 노드 흐름", "Gmail 증분 조회", "발주 기본정보 구조화", "정상 완료"),
+            ("실행된 노드 흐름", "지메일 새 메일 조회", "발주 기본정보 구조화", "정상 완료"),
         ),
         ("/mails", ("(수집 대기)",)),
         ("/mails/message-ui", ("message-ui",)),
@@ -61,3 +71,13 @@ def test_management_pages_render_observable_run(isolated_settings, monkeypatch) 
     assert "discover_gmail" not in run_response.text
     assert "enqueue_message" not in run_response.text
     assert 'branch-column active' in run_response.text
+
+    workflow_response = client.get("/workflows/mail_processing")
+    for internal_key in (
+        "discover_gmail",
+        "enqueue_message",
+        "classify_and_extract",
+        "process_order_sources",
+        "render_discord",
+    ):
+        assert internal_key not in workflow_response.text

@@ -17,13 +17,13 @@
   </article>
   <article class="panel">
     <div class="panel-head"><h2>최근 오류</h2><a href="/logs">전체 보기</a></div>
-    {% for error in data.recent_errors %}<a class="list-row" href="/runs/{{ error.workflow_run_id }}"><span><strong>{{ error.node_key }}</strong><small>{{ error.error_type }}</small></span><em>{{ error.finished_at_utc.strftime('%m/%d %H:%M') if error.finished_at_utc else '-' }}</em></a>{% else %}<div class="empty">최근 오류가 없습니다.</div>{% endfor %}
+    {% for error in data.recent_errors %}<a class="list-row" href="/runs/{{ error.workflow_run_id }}"><span><strong>{{ node_label(error.node_key) }}</strong><small>오류 발생</small></span><em>{{ error.finished_at_utc.strftime('%m/%d %H:%M') if error.finished_at_utc else '-' }}</em></a>{% else %}<div class="empty">최근 오류가 없습니다.</div>{% endfor %}
   </article>
 </section>
 <section class="grid two">
   <article class="panel">
     <div class="panel-head"><h2>최근 실행</h2><a href="/runs">전체 보기</a></div>
-    {% for run in data.recent_runs %}<a class="list-row" href="/runs/{{ run.id }}"><span><strong>{{ '메일 처리' if run.workflow_type == 'mail_processing' else '오더시트·재고 갱신' }}</strong><small>{{ run.trigger_type }}</small></span><span class="pill {{ run.status|lower }}">{{ run.status }}</span></a>{% else %}<div class="empty">아직 실행 기록이 없습니다.</div>{% endfor %}
+    {% for run in data.recent_runs %}<a class="list-row" href="/runs/{{ run.id }}"><span><strong>{{ '메일 처리' if run.workflow_type == 'mail_processing' else '오더시트·재고 갱신' }}</strong><small>{{ trigger_label(run.trigger_type) }}</small></span><span class="pill {{ run.status|lower }}">{{ run_status_label(run.status) }}</span></a>{% else %}<div class="empty">아직 실행 기록이 없습니다.</div>{% endfor %}
   </article>
   <article class="panel">
     <div class="panel-head"><h2>최근 수집 메일</h2><a href="/mails">전체 보기</a></div>

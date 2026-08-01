@@ -12,19 +12,19 @@
   {% endfor %}
   <div class="flow-rows">
     {% for row in common.nodes|batch(4) %}
-      <div class="common-flow">{% for node in row %}<div class="flow-node"><small>{{ node.key }}</small><strong>{{ node.label }}</strong></div>{% endfor %}</div>
+      <div class="common-flow">{% for node in row %}<div class="flow-node"><small>공통 처리</small><strong>{{ node.label }}</strong></div>{% endfor %}</div>
       {% if not loop.last %}<div class="flow-down" aria-hidden="true">↓</div>{% endif %}
     {% endfor %}
   </div>
   {% if workflow_type == 'mail_processing' %}
   <div class="router-node">카테고리 분기</div>
   <div class="branch-grid">
-    {% for branch, nodes in grouped.items() if branch not in ['common', 'router'] %}<div class="branch-column"><h3>{{ branch }}</h3>{% for node in nodes %}<div class="flow-node branch"><small>{{ node.key }}</small><strong>{{ node.label }}</strong></div>{% endfor %}</div>{% endfor %}
+    {% for branch, nodes in grouped.items() if branch not in ['common', 'router'] %}<div class="branch-column"><h3>{{ branch }}</h3>{% for node in nodes %}<div class="flow-node branch"><small>{{ branch }} 분기</small><strong>{{ node.label }}</strong></div>{% endfor %}</div>{% endfor %}
   </div>
   <div class="common-flow tail">
-    {% for node in graph if node.stage == 'common' and node.key in ['render_discord','dispatch_outbox','finalize_case'] %}<div class="flow-node future"><small>{{ node.key }}</small><strong>{{ node.label }}</strong><em>후속 이슈</em></div>{% endfor %}
+    {% for node in graph if node.stage == 'common' and node.key in ['render_discord','dispatch_outbox','finalize_case'] %}<div class="flow-node future"><small>후속 처리</small><strong>{{ node.label }}</strong><em>후속 이슈</em></div>{% endfor %}
   </div>
   {% endif %}
 </section>
-<section class="panel"><div class="panel-head"><h2>최근 실행</h2><a href="/runs?workflow_type={{ workflow_type }}">전체 보기</a></div>{% for run in runs %}<a class="list-row" href="/runs/{{ run.id }}"><span><strong>{{ run.started_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</strong><small>{{ run.trigger_type }}</small></span><span class="pill {{ run.status|lower }}">{{ run.status }}</span></a>{% else %}<div class="empty">실행 기록이 없습니다.</div>{% endfor %}</section>
+<section class="panel"><div class="panel-head"><h2>최근 실행</h2><a href="/runs?workflow_type={{ workflow_type }}">전체 보기</a></div>{% for run in runs %}<a class="list-row" href="/runs/{{ run.id }}"><span><strong>{{ run.started_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</strong><small>{{ trigger_label(run.trigger_type) }}</small></span><span class="pill {{ run.status|lower }}">{{ run_status_label(run.status) }}</span></a>{% else %}<div class="empty">실행 기록이 없습니다.</div>{% endfor %}</section>
 {% endblock %}

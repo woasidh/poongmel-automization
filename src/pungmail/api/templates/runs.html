@@ -4,10 +4,10 @@
 {% block content %}
 <form class="filters" method="get">
   <select name="workflow_type"><option value="">전체 워크플로</option><option value="mail_processing" {{ 'selected' if workflow_type == 'mail_processing' }}>메일 처리</option><option value="order_status_refresh" {{ 'selected' if workflow_type == 'order_status_refresh' }}>오더시트·재고 갱신</option></select>
-  <select name="status"><option value="">전체 상태</option>{% for value in ['SUCCEEDED','PARTIAL','FAILED','RUNNING'] %}<option value="{{ value }}" {{ 'selected' if status == value }}>{{ value }}</option>{% endfor %}</select>
+  <select name="status"><option value="">전체 상태</option>{% for value in ['SUCCEEDED','PARTIAL','FAILED','RUNNING'] %}<option value="{{ value }}" {{ 'selected' if status == value }}>{{ run_status_label(value) }}</option>{% endfor %}</select>
   <button>필터 적용</button>
 </form>
 <section class="panel table-wrap"><table><thead><tr><th>워크플로</th><th>트리거</th><th>시작</th><th>종료</th><th>상태</th></tr></thead><tbody>
-{% for run in runs %}<tr><td><a href="/runs/{{ run.id }}">{{ '메일 처리' if run.workflow_type == 'mail_processing' else '오더시트·재고 갱신' }}</a><small class="mono">{{ run.id }}</small></td><td>{{ run.trigger_type }}</td><td>{{ run.started_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</td><td>{{ run.finished_at_utc.strftime('%Y-%m-%d %H:%M:%S') if run.finished_at_utc else '-' }}</td><td><span class="pill {{ run.status|lower }}">{{ run.status }}</span></td></tr>{% else %}<tr><td colspan="5" class="empty">실행 기록이 없습니다.</td></tr>{% endfor %}
+{% for run in runs %}<tr><td><a href="/runs/{{ run.id }}">{{ '메일 처리' if run.workflow_type == 'mail_processing' else '오더시트·재고 갱신' }}</a><small class="mono">{{ run.id }}</small></td><td>{{ trigger_label(run.trigger_type) }}</td><td>{{ run.started_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</td><td>{{ run.finished_at_utc.strftime('%Y-%m-%d %H:%M:%S') if run.finished_at_utc else '-' }}</td><td><span class="pill {{ run.status|lower }}">{{ run_status_label(run.status) }}</span></td></tr>{% else %}<tr><td colspan="5" class="empty">실행 기록이 없습니다.</td></tr>{% endfor %}
 </tbody></table></section>
 {% endblock %}

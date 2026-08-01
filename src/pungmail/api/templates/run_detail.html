@@ -34,8 +34,8 @@
 {% block content %}
 <section class="summary-strip">
   <div><span>워크플로</span><strong>{{ workflow_name }}</strong></div>
-  <div><span>실행 방식</span><strong>{{ trigger_label }}</strong></div>
-  <div><span>전체 결과</span><strong class="pill {{ run.status|lower }}">{{ run_status_label }}</strong></div>
+  <div><span>실행 방식</span><strong>{{ selected_trigger_label }}</strong></div>
+  <div><span>전체 결과</span><strong class="pill {{ run.status|lower }}">{{ selected_run_status_label }}</strong></div>
   <div><span>시작</span><strong>{{ run.started_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</strong></div>
 </section>
 

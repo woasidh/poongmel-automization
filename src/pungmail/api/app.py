@@ -62,6 +62,16 @@ TRIGGER_LABELS = {
     "TEST": "테스트",
 }
 
+NODE_LABELS = {
+    node.key: node.label
+    for graph in WORKFLOW_GRAPHS.values()
+    for node in graph
+}
+
+
+def _node_label(node_key: str) -> str:
+    return NODE_LABELS.get(node_key, "기타 처리 단계")
+
 
 def _build_run_graph(workflow_type: str, node_runs: list[Any]) -> dict[str, Any]:
     definitions = WORKFLOW_GRAPHS.get(workflow_type, ())
@@ -174,6 +184,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "version": __version__,
             "now": datetime.now(UTC),
             "parse_json": parse_json,
+            "node_label": _node_label,
+            "node_status_label": lambda status: NODE_STATUS_LABELS.get(status, "상태 확인 필요"),
+            "run_status_label": lambda status: RUN_STATUS_LABELS.get(status, "상태 확인 필요"),
+            "trigger_label": lambda trigger: TRIGGER_LABELS.get(trigger, "실행 방식 확인 필요"),
             **values,
         }
 
@@ -216,7 +230,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @application.get("/workflows", response_class=HTMLResponse)
     def workflows(request: Request) -> HTMLResponse:
         rows = [
-            {"key": "mail_processing", "name": "메일 처리", "schedule": "1분마다", "description": "Gmail 수집부터 카테고리 분기까지", "nodes": len(WORKFLOW_GRAPHS["mail_processing"])},
+            {"key": "mail_processing", "name": "메일 처리", "schedule": "1분마다", "description": "지메일 수집부터 카테고리 분기까지", "nodes": len(WORKFLOW_GRAPHS["mail_processing"])},
             {"key": "order_status_refresh", "name": "오더시트·재고 갱신", "schedule": "1시간마다", "description": "이슈 1에서는 실행 가능한 골격", "nodes": len(WORKFLOW_GRAPHS["order_status_refresh"])},
         ]
         return templates.TemplateResponse(request, "workflows.html", context(request, workflows=rows))
@@ -255,8 +269,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 request,
                 run=run,
                 workflow_name=WORKFLOW_LABELS.get(run.workflow_type, run.workflow_type),
-                run_status_label=RUN_STATUS_LABELS.get(run.status, run.status),
-                trigger_label=TRIGGER_LABELS.get(run.trigger_type, run.trigger_type),
+                selected_run_status_label=RUN_STATUS_LABELS.get(run.status, "상태 확인 필요"),
+                selected_trigger_label=TRIGGER_LABELS.get(run.trigger_type, "실행 방식 확인 필요"),
                 graph=_build_run_graph(run.workflow_type, nodes),
                 node_record_count=len(nodes),
             ),
