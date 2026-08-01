@@ -15,6 +15,7 @@ dependencies = [
   "google-auth==2.56.2",
   "google-auth-oauthlib==1.4.0",
   "jinja2==3.1.6",
+  "openai==2.52.0",
   "openpyxl==3.1.5",
   "pillow==12.3.0",
   "prefect==3.8.1",
@@ -47,7 +48,7 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-pungmail = ["api/templates/*.html", "api/static/*.css"]
+pungmail = ["api/templates/*.html", "api/static/*.css", "prompts/*.md", "prompts/categories/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     project_root: Path = PROJECT_ROOT
     database_path: Path = PROJECT_ROOT / "data" / "pungmail.db"
     evidence_path: Path = PROJECT_ROOT / "runtime" / "evidence"
+    ai_response_path: Path = PROJECT_ROOT / "runtime" / "ai-responses"
     log_path: Path = PROJECT_ROOT / "runtime" / "logs" / "pungmail.jsonl"
     prefect_home: Path = PROJECT_ROOT / "runtime" / "prefect"
     prefect_api_url: str = "http://127.0.0.1:4200/api"
@@ -30,6 +31,19 @@ class Settings(BaseSettings):
     )
     gmail_token_path: Path = Path(r"C:\Users\ASUS\Documents\New project\token.json")
     gmail_enabled: bool = True
+
+    openai_model: str = "gpt-5.4-nano"
+    openai_reasoning_effort: str = "low"
+    openai_timeout_seconds: int = Field(default=90, ge=10, le=300)
+    openai_secret_env_path: Path = Path(
+        r"C:\Users\ASUS\Documents\New project\.final_review_secrets.env"
+    )
+    company_catalog_path: Path = Path(
+        r"C:\Users\ASUS\.codex\skills\distinguish-beauty-item-names\references\company-beauty-items.ndjson"
+    )
+    discord_mode: str = "PREVIEW"
+    discord_test_webhooks_json: str = "{}"
+    outbox_max_attempts: int = Field(default=5, ge=1, le=20)
 
     mail_check_interval_seconds: int = Field(default=60, ge=10, le=3600)
     max_messages_per_run: int = Field(default=25, ge=1, le=200)
@@ -51,6 +65,7 @@ class Settings(BaseSettings):
         for path in (
             self.database_path.parent,
             self.evidence_path,
+            self.ai_response_path,
             self.log_path.parent,
             self.prefect_home,
             self.project_root / "runtime" / "backups",

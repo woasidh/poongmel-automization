@@ -1,1 +1,3 @@
-"""도메인 모델과 상태 정의."""
+from pungmail.domain.decisions import Category, MailDecision
+
+__all__ = ["Category", "MailDecision"]
