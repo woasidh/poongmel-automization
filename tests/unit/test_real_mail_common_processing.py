@@ -281,3 +281,20 @@ def test_outgoing_supplier_document_request_is_not_generic_internal_work() -> No
         True,
         False,
     ]
+
+    hold_payload = decision.model_dump(mode="json")
+    hold_payload["category"] = "보류"
+    hold_payload["category_payload"] = {
+        "payload_type": "HOLD",
+        "failure_node": None,
+        "failure_type": "MISSING_ITEM_CATALOG_MATCH",
+        "unresolved_values": ["SELACHYL ALCOHOL V"],
+        "check_items": ["회사 카탈로그 확인"],
+        "retryable": True,
+    }
+    guarded_hold = apply_direction_guards(
+        MailDecision.model_validate(hold_payload), evidence
+    )
+
+    assert guarded_hold.category.value == "풍림자료요청"
+    assert guarded_hold.category_payload.supplier_route == "기타"

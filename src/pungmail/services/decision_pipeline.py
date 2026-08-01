@@ -14,7 +14,6 @@ from pungmail.config import Settings, get_settings
 from pungmail.domain.decisions import (
     CatalogItemInput,
     Category,
-    InternalWorkPayload,
     MailDecision,
     OrderPayload,
     PunglimDocumentRequestPayload,
@@ -329,8 +328,10 @@ def apply_direction_guards(
             }
         )
 
-    if decision.category == Category.INTERNAL_WORK and isinstance(
-        decision.category_payload, InternalWorkPayload
+    if decision.category in (
+        Category.INTERNAL_WORK,
+        Category.OVERSEAS_WORK,
+        Category.HOLD,
     ):
         first_text = "\n".join(
             str(first.get(key) or "") for key in ("subject", "actual_body")
