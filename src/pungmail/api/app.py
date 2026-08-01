@@ -58,6 +58,7 @@ RUN_STATUS_LABELS = {
 TRIGGER_LABELS = {
     "SCHEDULED": "정기 실행",
     "MANUAL": "수동 실행",
+    "VALIDATION": "실제 메일 검증",
     "RECOVERY": "복구 실행",
     "TEST": "테스트",
 }

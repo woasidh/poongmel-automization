@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from base64 import urlsafe_b64encode
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
-from pungmail.adapters.gmail.evidence import MessageEvidenceCollector
+from pungmail.adapters.gmail.evidence import EvidenceStore, MessageEvidenceCollector
 from pungmail.adapters.legacy.extractor import ExtractionResult
 
 
@@ -51,3 +52,17 @@ def test_evidence_store_keeps_raw_body_and_extracted_attachment(isolated_setting
     assert attachments[0].extraction_status == "READ"
     extracted_path = isolated_settings.project_root / str(attachments[0].extracted_text_path)
     assert extracted_path.read_text(encoding="utf-8") == "attachment text"
+
+
+def test_evidence_store_serializes_real_message_datetimes(isolated_settings) -> None:
+    store = EvidenceStore(isolated_settings)
+    sent_at = datetime(2026, 8, 2, 9, 30, tzinfo=UTC)
+
+    stored_path, _digest = store.write_json(
+        store.message_dir("real-thread", "real-message") / "thread-manifest.json",
+        [{"message_id": "real-message", "internal_date_utc": sent_at}],
+    )
+
+    saved = store.resolve(stored_path)
+    assert saved is not None
+    assert sent_at.isoformat() in saved.read_text(encoding="utf-8")

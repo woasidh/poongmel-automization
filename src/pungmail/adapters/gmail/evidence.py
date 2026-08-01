@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -14,6 +15,12 @@ from pungmail.adapters.gmail.client import GmailReadOnlyClient
 from pungmail.adapters.gmail.parser import ParsedMessage, parse_raw_message
 from pungmail.adapters.legacy.extractor import LegacyEvidenceExtractor
 from pungmail.config import Settings, get_settings
+
+
+def _json_default(value: Any) -> str:
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return str(value)
 
 
 @dataclass(frozen=True)
@@ -53,7 +60,13 @@ class EvidenceStore:
         return self.write_bytes(path, value.encode("utf-8"))
 
     def write_json(self, path: Path, value: Any) -> tuple[str, str]:
-        data = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
+        data = json.dumps(
+            value,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+            default=_json_default,
+        ).encode("utf-8")
         return self.write_bytes(path, data)
 
     def relative(self, path: Path) -> str:
