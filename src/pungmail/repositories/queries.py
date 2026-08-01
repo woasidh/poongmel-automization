@@ -149,8 +149,9 @@ def get_mail_detail(message_id: str) -> dict[str, Any] | None:
             .where(NodeRun.mail_event_id == event.id)
             .order_by(NodeRun.started_at_utc.asc(), NodeRun.node_key.asc())
         ).all()
-        for row in [message, event, *thread_messages, *attachments, *evidence, *nodes]:
-            session.expunge(row)
+        # 대표 메일은 thread_messages에도 포함될 수 있으므로 개별 expunge 시
+        # 동일 ORM 객체를 두 번 분리하게 된다. 조회 결과 전체를 한 번에 분리한다.
+        session.expunge_all()
         return {
             "message": message,
             "event": event,
