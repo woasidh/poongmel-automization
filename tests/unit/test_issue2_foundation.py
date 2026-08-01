@@ -75,10 +75,12 @@ def test_prompt_manifest_is_deterministic_and_complete() -> None:
     first = build_prompt_bundle()
     second = build_prompt_bundle()
     assert first.sha256 == second.sha256
-    assert first.version == "issue2-v1"
+    assert first.version == "issue2-real-v2"
     assert len(first.files) == 9
     assert all(len(item.sha256) == 64 for item in first.files)
     assert "메일 한 건" in first.content
+    assert "최초 주문 방향은 바뀌지 않는다" in first.content
+    assert "해외업무보다 풍림자료요청을 우선" in first.content
 
 
 def test_company_catalog_retains_duplicates_and_hides_deleted() -> None:

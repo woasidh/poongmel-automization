@@ -20,6 +20,9 @@ from pungmail.repositories.models import (
 )
 
 
+AI_ATTACHMENT_TEXT_LIMIT = 12_000
+
+
 def _read(settings: Settings, stored_path: str | None, limit: int = 200_000) -> str:
     if not stored_path:
         return ""
@@ -33,6 +36,14 @@ def _read(settings: Settings, stored_path: str | None, limit: int = 200_000) -> 
     if not resolved.exists():
         return ""
     return resolved.read_text(encoding="utf-8", errors="replace")[:limit]
+
+
+def _attachment_text(
+    settings: Settings,
+    stored_path: str | None,
+) -> tuple[str, bool]:
+    value = _read(settings, stored_path, limit=AI_ATTACHMENT_TEXT_LIMIT + 1)
+    return value[:AI_ATTACHMENT_TEXT_LIMIT], len(value) > AI_ATTACHMENT_TEXT_LIMIT
 
 
 def build_ai_evidence(
@@ -59,6 +70,26 @@ def build_ai_evidence(
             .where(MailAttachment.gmail_message_id.in_(message_ids))
             .order_by(MailAttachment.gmail_message_id, MailAttachment.file_name)
         ).all()
+        attachment_evidence: list[dict[str, Any]] = []
+        for row in attachments:
+            extracted_text, extracted_truncated = _attachment_text(
+                active, row.extracted_text_path
+            )
+            ocr_text, ocr_truncated = _attachment_text(active, row.ocr_text_path)
+            attachment_evidence.append(
+                {
+                    "ref": f"attachment:{row.id}",
+                    "message_id": row.gmail_message_id,
+                    "file_name": row.file_name,
+                    "mime_type": row.mime_type,
+                    "extraction_status": row.extraction_status,
+                    "extracted_text": extracted_text,
+                    "ocr_text": ocr_text,
+                    "text_truncated_for_ai": extracted_truncated or ocr_truncated,
+                    "ai_text_limit_chars": AI_ATTACHMENT_TEXT_LIMIT,
+                    "warnings": json.loads(row.warning_json),
+                }
+            )
         return {
             "target_message_id": message.message_id,
             "thread_id": message.thread_id,
@@ -77,19 +108,7 @@ def build_ai_evidence(
                 }
                 for row in thread
             ],
-            "attachments": [
-                {
-                    "ref": f"attachment:{row.id}",
-                    "message_id": row.gmail_message_id,
-                    "file_name": row.file_name,
-                    "mime_type": row.mime_type,
-                    "extraction_status": row.extraction_status,
-                    "extracted_text": _read(active, row.extracted_text_path),
-                    "ocr_text": _read(active, row.ocr_text_path),
-                    "warnings": json.loads(row.warning_json),
-                }
-                for row in attachments
-            ],
+            "attachments": attachment_evidence,
         }
 
 

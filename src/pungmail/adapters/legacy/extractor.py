@@ -5,6 +5,7 @@ from importlib.util import module_from_spec, spec_from_file_location
 from io import BytesIO
 import mimetypes
 from pathlib import Path
+import re
 import sys
 from types import ModuleType
 
@@ -20,6 +21,31 @@ class ExtractionResult:
     ocr_text: str = ""
     status: str = "NO_TEXT"
     warnings: tuple[str, ...] = field(default_factory=tuple)
+
+
+def extract_pdf_tables(data: bytes) -> str:
+    """PDF 표를 행·열 경계가 보존된 텍스트로 변환한다."""
+    import pdfplumber
+
+    sections: list[str] = []
+    with pdfplumber.open(BytesIO(data)) as pdf:
+        for page_number, page in enumerate(pdf.pages, start=1):
+            for table_number, table in enumerate(page.extract_tables(), start=1):
+                rows: list[str] = []
+                for raw_row in table:
+                    cells = [
+                        re.sub(r"\s+", " ", str(cell or "")).strip()
+                        for cell in raw_row
+                    ]
+                    if sum(bool(cell) for cell in cells) < 2:
+                        continue
+                    rows.append("\t".join(cells))
+                if rows:
+                    sections.append(
+                        f"[표 구조: {page_number}페이지 {table_number}번 표]\n"
+                        + "\n".join(rows)
+                    )
+    return "\n\n".join(sections)
 
 
 class LegacyEvidenceExtractor:
@@ -88,6 +114,13 @@ class LegacyEvidenceExtractor:
             )
         except Exception as exc:
             warnings.append(f"PDF text: {type(exc).__name__}: {exc}")
+
+        try:
+            table_text = extract_pdf_tables(data)
+            if table_text:
+                text = f"{text}\n\n{table_text}".strip()
+        except Exception as exc:
+            warnings.append(f"PDF tables: {type(exc).__name__}: {exc}")
 
         needs_ocr = len(text.strip()) < 80 or bool(
             self.module._pdf_order_text_needs_ocr(filename, text)
