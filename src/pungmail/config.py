@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     database_path: Path = PROJECT_ROOT / "data" / "pungmail.db"
     evidence_path: Path = PROJECT_ROOT / "runtime" / "evidence"
     ai_response_path: Path = PROJECT_ROOT / "runtime" / "ai-responses"
+    card_path: Path = PROJECT_ROOT / "runtime" / "cards"
     log_path: Path = PROJECT_ROOT / "runtime" / "logs" / "pungmail.jsonl"
     prefect_home: Path = PROJECT_ROOT / "runtime" / "prefect"
     prefect_api_url: str = "http://127.0.0.1:4200/api"
@@ -66,6 +67,7 @@ class Settings(BaseSettings):
             self.database_path.parent,
             self.evidence_path,
             self.ai_response_path,
+            self.card_path,
             self.log_path.parent,
             self.prefect_home,
             self.project_root / "runtime" / "backups",

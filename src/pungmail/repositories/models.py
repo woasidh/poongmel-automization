@@ -347,6 +347,7 @@ class DiscordOutbox(Base):
     target_channel_key: Mapped[str] = mapped_column(String(64))
     body_path: Mapped[str] = mapped_column(Text)
     body_sha256: Mapped[str] = mapped_column(String(64))
+    source_gmail_message_id: Mapped[str] = mapped_column(String(128), default="")
     idempotency_key: Mapped[str] = mapped_column(String(64), unique=True)
     status: Mapped[str] = mapped_column(String(32), default="PENDING", index=True)
     attempt_count: Mapped[int] = mapped_column(Integer, default=0)

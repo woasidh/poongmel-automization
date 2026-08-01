@@ -7,6 +7,8 @@ __pycache__/
 htmlcov/
 data/*.db*
 runtime/evidence/
+runtime/ai-responses/
+runtime/cards/
 runtime/logs/
 runtime/prefect/
 runtime/backups/
