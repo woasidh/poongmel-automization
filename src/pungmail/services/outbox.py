@@ -27,7 +27,13 @@ def queue_card(
         mapping = session.scalar(
             select(DiscordMapping).where(DiscordMapping.business_case_id == case.id)
         )
-        operation = "REPLACE" if mapping else "CREATE"
+        previous_preview = session.scalar(
+            select(DiscordOutbox)
+            .where(DiscordOutbox.business_case_id == case.id)
+            .order_by(DiscordOutbox.created_at_utc.desc())
+            .limit(1)
+        )
+        operation = "REPLACE" if mapping or previous_preview else "CREATE"
         identity = f"{case.id}:{case.current_revision}:{card.channel_key}:{card.body_sha256}"
         idempotency_key = sha256(identity.encode("utf-8")).hexdigest()
         existing = session.scalar(
@@ -47,9 +53,21 @@ def queue_card(
             source_gmail_message_id=source_gmail_message_id,
             idempotency_key=idempotency_key,
             status=status,
-            previous_channel_key=mapping.channel_key if mapping else None,
-            previous_message_id=mapping.message_id if mapping else None,
-            previous_body_path=mapping.last_body_path if mapping else None,
+            previous_channel_key=(
+                mapping.channel_key
+                if mapping
+                else previous_preview.target_channel_key if previous_preview else None
+            ),
+            previous_message_id=(
+                mapping.message_id
+                if mapping
+                else f"PREVIEW:{previous_preview.id}" if previous_preview else None
+            ),
+            previous_body_path=(
+                mapping.last_body_path
+                if mapping
+                else previous_preview.body_path if previous_preview else None
+            ),
         )
         session.add(row)
         session.flush()

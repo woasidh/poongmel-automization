@@ -8,6 +8,12 @@ from sqlalchemy import desc, func, select
 
 from pungmail.repositories.database import session_scope
 from pungmail.repositories.models import (
+    AIDecision,
+    BusinessCase,
+    CaseHistory,
+    CaseLookupKey,
+    DiscordMapping,
+    DiscordOutbox,
     EvidenceSnapshot,
     GmailMessage,
     GmailPendingMessage,
@@ -15,6 +21,9 @@ from pungmail.repositories.models import (
     MailEvent,
     NodeRun,
     WorkflowRun,
+    RequestCase,
+    RequestComponent,
+    RequestItem,
 )
 
 
@@ -169,3 +178,118 @@ def parse_json(value: str | None, fallback: Any) -> Any:
         return json.loads(value)
     except json.JSONDecodeError:
         return fallback
+
+
+def list_ai_decisions(limit: int = 200) -> list[tuple[AIDecision, GmailMessage]]:
+    with session_scope() as session:
+        rows = session.execute(
+            select(AIDecision, GmailMessage)
+            .join(MailEvent, AIDecision.mail_event_id == MailEvent.id)
+            .join(GmailMessage, MailEvent.gmail_message_id == GmailMessage.message_id)
+            .order_by(desc(AIDecision.created_at_utc))
+            .limit(limit)
+        ).all()
+        session.expunge_all()
+        return list(rows)
+
+
+def get_ai_decision(decision_id: str) -> dict[str, Any] | None:
+    with session_scope() as session:
+        decision = session.get(AIDecision, decision_id)
+        if decision is None:
+            return None
+        event = session.get(MailEvent, decision.mail_event_id)
+        message = session.get(GmailMessage, event.gmail_message_id) if event else None
+        case = (
+            session.get(BusinessCase, event.business_case_id)
+            if event and event.business_case_id
+            else None
+        )
+        session.expunge_all()
+        return {"decision": decision, "event": event, "message": message, "case": case}
+
+
+def list_business_cases(limit: int = 200) -> list[BusinessCase]:
+    with session_scope() as session:
+        rows = session.scalars(
+            select(BusinessCase).order_by(desc(BusinessCase.updated_at_utc)).limit(limit)
+        ).all()
+        for row in rows:
+            session.expunge(row)
+        return list(rows)
+
+
+def get_business_case(case_id: str) -> dict[str, Any] | None:
+    with session_scope() as session:
+        case = session.get(BusinessCase, case_id)
+        if case is None:
+            return None
+        history = session.scalars(
+            select(CaseHistory)
+            .where(CaseHistory.business_case_id == case.id)
+            .order_by(desc(CaseHistory.revision))
+        ).all()
+        events = session.execute(
+            select(MailEvent, GmailMessage)
+            .join(GmailMessage, MailEvent.gmail_message_id == GmailMessage.message_id)
+            .where(MailEvent.business_case_id == case.id)
+            .order_by(MailEvent.created_at_utc)
+        ).all()
+        keys = session.scalars(
+            select(CaseLookupKey)
+            .where(CaseLookupKey.business_case_id == case.id)
+            .order_by(CaseLookupKey.key_type, CaseLookupKey.key_value)
+        ).all()
+        request = session.scalar(
+            select(RequestCase).where(RequestCase.business_case_id == case.id)
+        )
+        items = (
+            session.scalars(
+                select(RequestItem)
+                .where(RequestItem.request_case_id == request.id)
+                .order_by(RequestItem.sequence)
+            ).all()
+            if request
+            else []
+        )
+        components = (
+            session.scalars(
+                select(RequestComponent)
+                .where(RequestComponent.request_case_id == request.id)
+                .order_by(RequestComponent.sequence)
+            ).all()
+            if request
+            else []
+        )
+        mapping = session.scalar(
+            select(DiscordMapping).where(DiscordMapping.business_case_id == case.id)
+        )
+        outbox = session.scalars(
+            select(DiscordOutbox)
+            .where(DiscordOutbox.business_case_id == case.id)
+            .order_by(desc(DiscordOutbox.created_at_utc))
+        ).all()
+        session.expunge_all()
+        return {
+            "case": case,
+            "history": list(history),
+            "events": list(events),
+            "keys": list(keys),
+            "request_case": request,
+            "items": list(items),
+            "components": list(components),
+            "mapping": mapping,
+            "outbox": list(outbox),
+        }
+
+
+def list_outbox(limit: int = 300) -> list[tuple[DiscordOutbox, BusinessCase]]:
+    with session_scope() as session:
+        rows = session.execute(
+            select(DiscordOutbox, BusinessCase)
+            .join(BusinessCase, DiscordOutbox.business_case_id == BusinessCase.id)
+            .order_by(desc(DiscordOutbox.created_at_utc))
+            .limit(limit)
+        ).all()
+        session.expunge_all()
+        return list(rows)

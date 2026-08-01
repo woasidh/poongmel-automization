@@ -32,12 +32,12 @@ def test_management_pages_render_observable_run(isolated_settings, monkeypatch) 
         ("/", ("운영 대시보드",)),
         (
             "/workflows/mail_processing",
-            ("메일 처리", "발주", "오더시트·재고표 확인", "오더", "RW·SI DB 처리", "보류"),
+            ("메일 처리", "발주", "오더시트·재고표 확인", "오더", "RW·SI 기본정보 구조화", "보류"),
         ),
         ("/runs", ("실행 이력",)),
         (
             f"/runs/{run_id}",
-            ("실행된 노드 흐름", "Gmail 증분 조회", "발주 DB·4종 근거 처리", "정상 완료"),
+            ("실행된 노드 흐름", "Gmail 증분 조회", "발주 기본정보 구조화", "정상 완료"),
         ),
         ("/mails", ("(수집 대기)",)),
         ("/mails/message-ui", ("message-ui",)),
@@ -46,6 +46,16 @@ def test_management_pages_render_observable_run(isolated_settings, monkeypatch) 
         assert response.status_code == 200
         for expected in expected_values:
             assert expected in response.text
+
+    for path, heading in (
+        ("/cases", "업무"),
+        ("/decisions", "AI 판정"),
+        ("/prompts", "프롬프트"),
+        ("/outbox", "알림 Outbox"),
+    ):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert heading in response.text
 
     run_response = client.get(f"/runs/{run_id}")
     assert "discover_gmail" not in run_response.text

@@ -146,6 +146,25 @@ def mark_completed(message_id: str, event_id: str) -> None:
             event.current_node = "extract_evidence"
 
 
+def finalize_message(
+    message_id: str,
+    event_id: str,
+    *,
+    event_status: str = "COMPLETED",
+) -> None:
+    with session_scope() as session:
+        pending = session.get(GmailPendingMessage, message_id)
+        event = session.get(MailEvent, event_id)
+        if pending is not None:
+            pending.status = "COMPLETED"
+            pending.next_attempt_at_utc = None
+            pending.last_error = None
+        if event is not None:
+            event.status = event_status
+            event.current_node = "finalize_case"
+            event.updated_at_utc = datetime.now(UTC)
+
+
 def mark_excluded(message_id: str, event_id: str, reason: str) -> None:
     with session_scope() as session:
         pending = session.get(GmailPendingMessage, message_id)

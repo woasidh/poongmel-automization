@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}AI 판정 · 풍멜이{% endblock %}
+{% block heading %}AI 판정{% endblock %}
+{% block content %}
+<section class="hero compact"><div><span class="pulse"></span>메일당 한 번의 구조화 판정</div><strong>모델·프롬프트·근거·실패 원인을 추적합니다</strong></section>
+<section class="panel table-wrap">
+  <table>
+    <thead><tr><th>시각</th><th>메일</th><th>카테고리</th><th>제안</th><th>결과</th><th>모델</th></tr></thead>
+    <tbody>
+    {% for decision, message in decisions %}
+      <tr>
+        <td>{{ decision.created_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td><a href="/decisions/{{ decision.id }}">{{ message.subject }}</a><small>{{ message.sender }}</small></td>
+        <td><span class="category-badge">{{ decision.category }}</span></td>
+        <td>{{ decision.case_action }}</td>
+        <td><span class="pill {{ 'succeeded' if decision.status == 'SUCCEEDED' else 'failed' }}">{{ decision.status }}</span></td>
+        <td><code>{{ decision.model_id }}</code></td>
+      </tr>
+    {% else %}<tr><td colspan="6">아직 AI 판정 이력이 없습니다.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}AI 판정 상세 · 풍멜이{% endblock %}
+{% block heading %}AI 판정 상세{% endblock %}
+{% block content %}
+<section class="summary-strip">
+  <div><span>카테고리</span><strong>{{ decision.category }}</strong></div>
+  <div><span>업무 제안</span><strong>{{ decision.case_action }}</strong></div>
+  <div><span>판정 상태</span><strong class="pill {{ 'succeeded' if decision.status == 'SUCCEEDED' else 'failed' }}">{{ decision.status }}</strong></div>
+  <div><span>처리 시간</span><strong>{{ decision.latency_ms or '-' }} ms</strong></div>
+</section>
+<div class="grid two">
+  <section class="panel"><div class="panel-head"><h2>호출 정보</h2></div>
+    <dl class="detail-list">
+      <dt>메일</dt><dd>{% if message %}<a href="/mails/{{ message.message_id }}">{{ message.subject }}</a>{% else %}-{% endif %}</dd>
+      <dt>업무</dt><dd>{% if case %}<a href="/cases/{{ case.id }}">{{ case.case_key }}</a>{% else %}-{% endif %}</dd>
+      <dt>모델</dt><dd><code>{{ decision.model_id }}</code></dd>
+      <dt>응답 ID</dt><dd><code>{{ decision.response_id or '-' }}</code></dd>
+      <dt>Reasoning</dt><dd>{{ decision.reasoning_effort }}</dd>
+      <dt>토큰</dt><dd>입력 {{ decision.input_tokens or '-' }} / 출력 {{ decision.output_tokens or '-' }}</dd>
+      <dt>근거 SHA</dt><dd class="mono">{{ decision.evidence_bundle_sha256 }}</dd>
+    </dl>
+  </section>
+  <section class="panel"><div class="panel-head"><h2>프롬프트 기록</h2></div>
+    <dl class="detail-list"><dt>버전</dt><dd>{{ decision.prompt_version }}</dd><dt>Bundle SHA</dt><dd class="mono">{{ decision.prompt_bundle_sha256 }}</dd></dl>
+    <pre class="json-box">{{ parse_json(decision.prompt_manifest_json, {}) | tojson(indent=2) }}</pre>
+  </section>
+</div>
+{% if decision.error_message %}<section class="notice warning"><strong>{{ decision.error_type }}</strong> · {{ decision.error_message }}</section>{% endif %}
+<section class="panel"><div class="panel-head"><h2>구조화 결과</h2></div><pre class="json-box">{{ parse_json(decision.parsed_payload_json, {}) | tojson(indent=2) }}</pre></section>
+{% endblock %}

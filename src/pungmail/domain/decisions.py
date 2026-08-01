@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class StrictModel(BaseModel):
@@ -110,16 +110,15 @@ class HoldPayload(StrictModel):
     retryable: bool
 
 
-CategoryPayload = Annotated[
+CategoryPayload = (
     OrderPayload
     | UpstreamOrderPayload
     | SampleDocumentQuotePayload
     | PunglimDocumentRequestPayload
     | InternalWorkPayload
     | OverseasWorkPayload
-    | HoldPayload,
-    Field(discriminator="payload_type"),
-]
+    | HoldPayload
+)
 
 
 _PAYLOAD_CATEGORY = {
@@ -152,4 +151,3 @@ class MailDecision(StrictModel):
                 f"category {self.category} does not match payload {self.category_payload.payload_type}"
             )
         return self
-

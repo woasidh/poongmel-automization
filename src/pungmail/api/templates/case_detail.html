@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}업무 상세 · 풍멜이{% endblock %}
+{% block heading %}업무 상세{% endblock %}
+{% block content %}
+<section class="mail-title"><div><span class="category-badge">{{ case.category }}</span><h2>{{ case.subject }}</h2><p>{{ case.summary }}</p></div><div class="id-box"><span>CASE KEY</span><code>{{ case.case_key }}</code><span>REVISION</span><code>{{ case.current_revision }}</code></div></section>
+<section class="summary-strip"><div><span>상태</span><strong>{{ case.status }}</strong></div><div><span>업체</span><strong>{{ case.company or '-' }}</strong></div><div><span>알림 채널</span><strong>{{ case.card_channel_key or '-' }}</strong></div><div><span>연결 메일</span><strong>{{ events|length }}건</strong></div></section>
+<div class="grid two">
+  <section class="panel"><div class="panel-head"><h2>Discord 카드 미리보기</h2><span>{{ case.card_body_sha256 or '-' }}</span></div><pre class="discord-preview">{{ card_body or '아직 카드가 만들어지지 않았습니다.' }}</pre></section>
+  <section class="panel"><div class="panel-head"><h2>정확 연결 키</h2><span>exact match only</span></div>{% for key in keys %}<div class="evidence-row"><strong>{{ key.key_type }}</strong><code>{{ key.key_value }}</code></div>{% else %}<p>연결 키 없음</p>{% endfor %}</section>
+</div>
+{% if request_case %}<section class="panel"><div class="panel-head"><h2>요청 품목·진행 항목</h2><span>{{ request_case.overall_status }}</span></div>
+  <div class="request-grid"><div><h3>품목</h3>{% for item in items %}<article class="request-row"><strong>{{ item.company_display_name or item.raw_product_name }}</strong><span>{{ item.item_code or '미확정' }} · {{ item.spec or '-' }} · 업체(제품군 기준) {{ item.company_from_product_group or '미확정' }}</span>{% if parse_json(item.catalog_candidates_json, [])|length > 1 %}<em>동일명 후보 {{ parse_json(item.catalog_candidates_json, [])|length }}개 — 임의 선택 안 함</em>{% endif %}</article>{% endfor %}</div>
+  <div><h3>진행 항목</h3>{% for component in components %}<article class="request-row {{ 'done' if component.status == 'COMPLETED' else '' }}"><strong>{{ component.label }}</strong><span>{{ component.component_type }} · {{ component.status }}</span></article>{% endfor %}</div></div>
+</section>{% endif %}
+<section class="panel"><div class="panel-head"><h2>연결 메일</h2></div>{% for event, message in events %}<a class="list-row" href="/mails/{{ message.message_id }}"><span><strong>{{ message.subject }}</strong><small>{{ event.event_action }} · revision {{ event.applied_revision }}</small></span><span>{{ event.status }}</span></a>{% endfor %}</section>
+<section class="panel"><div class="panel-head"><h2>Revision 이력</h2></div>{% for row in history %}<details class="history-row"><summary>revision {{ row.revision }} · {{ row.change_summary }} · {{ row.created_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</summary><div class="grid two"><pre class="json-box">{{ parse_json(row.before_json, {})|tojson(indent=2) }}</pre><pre class="json-box">{{ parse_json(row.after_json, {})|tojson(indent=2) }}</pre></div></details>{% endfor %}</section>
+{% endblock %}

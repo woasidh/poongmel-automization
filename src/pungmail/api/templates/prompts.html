@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}프롬프트 · 풍멜이{% endblock %}
+{% block heading %}프롬프트{% endblock %}
+{% block content %}
+<section class="summary-strip"><div><span>활성 버전</span><strong>{{ bundle.version }}</strong></div><div><span>파일 수</span><strong>{{ bundle.files|length }}</strong></div><div style="grid-column:span 2"><span>Bundle SHA-256</span><strong class="mono">{{ bundle.sha256 }}</strong></div></section>
+<div class="prompt-layout"><section class="panel prompt-files">{% for item in bundle.files %}<a class="{{ 'active' if selected and selected.path == item.path else '' }}" href="/prompts?file={{ item.path }}"><strong>{{ item.path }}</strong><small>{{ item.sha256 }}</small></a>{% endfor %}</section><section class="panel"><div class="panel-head"><h2>{{ selected.path }}</h2><span>읽기 전용</span></div><pre class="prompt-body">{{ selected.content }}</pre></section></div>
+{% endblock %}

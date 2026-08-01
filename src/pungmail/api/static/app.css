@@ -169,8 +169,19 @@ td small{display:block;margin-top:4px;color:var(--muted)}
 .log-level{font:800 10px Arial,sans-serif}
 .log-level.error,.log-level.critical{color:var(--red)}
 .log-level.warning{color:var(--amber)}
+.hero.compact{min-height:68px;padding:18px 24px}
+.category-badge{display:inline-block;padding:5px 9px;border-radius:7px;background:var(--mint);color:var(--green);font-weight:800;font-size:11px}
+.detail-list{display:grid;grid-template-columns:100px 1fr;gap:10px 14px;margin:12px 0}
+.detail-list dt{color:var(--muted);font-size:11px}.detail-list dd{margin:0;word-break:break-all}.detail-list a{color:var(--green);font-weight:800;text-decoration:none}
+.json-box,.prompt-body,.discord-preview{max-height:520px;overflow:auto;white-space:pre-wrap;word-break:break-word;padding:15px;border:1px solid var(--line);border-radius:10px;background:#f6f8f6;font:11px/1.6 Consolas,"Malgun Gothic",monospace}
+.discord-preview{background:#2b2d31;color:#eef0f2;border:0;font-size:12px}
+.request-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}.request-grid h3{font-size:12px;color:var(--green)}
+.request-row{display:grid;gap:4px;padding:12px;border-bottom:1px solid var(--line)}.request-row span{color:var(--muted);font-size:11px}.request-row em{color:var(--amber);font-size:10px}.request-row.done strong{text-decoration:line-through;color:var(--muted)}
+.history-row{padding:13px 0;border-bottom:1px solid var(--line)}.history-row summary{cursor:pointer;font-weight:800}.history-row .grid{margin-top:12px}
+.prompt-layout{display:grid;grid-template-columns:280px 1fr;gap:20px}.prompt-files{padding:8px}.prompt-files a{display:grid;gap:4px;padding:12px;border-radius:9px;color:var(--ink);text-decoration:none}.prompt-files a:hover,.prompt-files a.active{background:var(--mint);color:var(--green)}.prompt-files small{font:8px Consolas,monospace;word-break:break-all;color:var(--muted)}.prompt-body{max-height:680px;font-family:"Malgun Gothic",sans-serif}
 @media(max-width:1100px){.metrics{grid-template-columns:repeat(3,1fr)}
 .grid.two,.workflow-cards{grid-template-columns:1fr}
+.prompt-layout,.request-grid{grid-template-columns:1fr}
 .common-flow{grid-template-columns:repeat(2,minmax(0,1fr))}
 .log-list article{grid-template-columns:140px 55px 1fr}
 .log-list p{grid-column:1/-1}

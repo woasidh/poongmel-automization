@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}알림 Outbox · 풍멜이{% endblock %}
+{% block heading %}알림 Outbox{% endblock %}
+{% block content %}
+<section class="notice {{ 'warning' if discord_mode == 'PREVIEW' else '' }}">현재 모드: <strong>{{ discord_mode }}</strong>{% if discord_mode == 'PREVIEW' %} · 네트워크 전송 없이 카드와 작업만 기록합니다.{% endif %}</section>
+<section class="panel table-wrap"><table><thead><tr><th>시각</th><th>업무</th><th>작업</th><th>목적 채널</th><th>상태</th><th>시도</th><th>이전 메시지</th><th>마지막 오류</th></tr></thead><tbody>
+{% for row, case in rows %}<tr><td>{{ row.created_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</td><td><a href="/cases/{{ case.id }}">{{ case.case_key }}</a><small>{{ case.subject }}</small></td><td>{{ row.operation }}</td><td>{{ row.target_channel_key }}</td><td><span class="pill {{ row.status|lower }}">{{ row.status }}</span></td><td>{{ row.attempt_count }}</td><td><code>{{ row.previous_message_id or '-' }}</code></td><td class="danger-text">{{ row.last_error or '-' }}</td></tr>{% else %}<tr><td colspan="8">Outbox 작업이 없습니다.</td></tr>{% endfor %}
+</tbody></table></section>
+{% endblock %}

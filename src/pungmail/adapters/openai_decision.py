@@ -104,7 +104,10 @@ class OpenAIMailDecisionClient:
         decision = (
             parsed if isinstance(parsed, MailDecision) else MailDecision.model_validate(parsed)
         )
-        raw_json = response.model_dump_json(indent=2, exclude_none=False)
+        raw_payload = response.model_dump(
+            mode="json", exclude_none=False, warnings=False
+        )
+        raw_json = json.dumps(raw_payload, ensure_ascii=False, indent=2, default=str)
         digest = sha256(raw_json.encode("utf-8")).hexdigest()
         response_id = str(response.id)
         target = self.settings.ai_response_path / f"{response_id}.json"

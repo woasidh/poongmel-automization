@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -57,6 +57,21 @@ class Settings(BaseSettings):
     tesseract_cmd: Path = Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe")
     ocr_languages: str = "kor+eng"
     log_level: str = "INFO"
+
+    @model_validator(mode="after")
+    def resolve_project_paths(self) -> Settings:
+        for field_name in (
+            "database_path",
+            "evidence_path",
+            "ai_response_path",
+            "card_path",
+            "log_path",
+            "prefect_home",
+        ):
+            value = getattr(self, field_name)
+            if not value.is_absolute():
+                setattr(self, field_name, (self.project_root / value).resolve())
+        return self
 
     @property
     def database_url(self) -> str:

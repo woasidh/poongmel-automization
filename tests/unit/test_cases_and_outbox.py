@@ -190,3 +190,17 @@ def test_preview_mode_never_dispatches_network(isolated_settings) -> None:
         assert row is not None and row.status == "PREVIEWED"
     with pytest.raises(RuntimeError, match="LIVE_TEST"):
         process_outbox_item(outbox_id, transport=FakeDiscord(), settings=isolated_settings)
+
+    enqueue_messages([{"id": "message-2", "threadId": "thread-1"}], run_id)
+    updated = apply_decision(
+        event_id("message-2"), decision("message-2", completed=True)
+    )
+    updated_card = render_case(updated.business_case_id, settings=isolated_settings)
+    second_id = queue_card(
+        updated_card, source_gmail_message_id="message-2", settings=isolated_settings
+    )
+    with session_scope() as session:
+        second = session.get(DiscordOutbox, second_id)
+        assert second is not None
+        assert second.operation == "REPLACE"
+        assert second.previous_message_id == f"PREVIEW:{outbox_id}"

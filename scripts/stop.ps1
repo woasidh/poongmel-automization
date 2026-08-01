@@ -10,7 +10,8 @@ function Stop-ProcessTree {
         Stop-ProcessTree -RootProcessId ([int]$child.ProcessId)
     }
     if (Get-Process -Id $RootProcessId -ErrorAction SilentlyContinue) {
-        Stop-Process -Id $RootProcessId -Force -ErrorAction Stop
+        # A child can exit between discovery and termination; that race is harmless.
+        Stop-Process -Id $RootProcessId -Force -ErrorAction SilentlyContinue
     }
 }
 

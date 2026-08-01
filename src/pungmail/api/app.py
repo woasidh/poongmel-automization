@@ -14,12 +14,18 @@ from sqlalchemy import text
 from pungmail import __version__
 from pungmail.config import Settings, get_settings
 from pungmail.observability.logging import configure_logging, read_log_lines
+from pungmail.prompts import build_prompt_bundle
 from pungmail.repositories.database import session_scope
 from pungmail.repositories.queries import (
     dashboard_data,
     get_mail_detail,
+    get_ai_decision,
+    get_business_case,
     get_run,
     list_mails,
+    list_ai_decisions,
+    list_business_cases,
+    list_outbox,
     list_runs,
     parse_json,
 )
@@ -287,6 +293,69 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def logs_page(request: Request, q: str = Query(default="", max_length=160), level: str = "") -> HTMLResponse:
         rows = read_log_lines(active.log_path, query=q, level=level)
         return templates.TemplateResponse(request, "logs.html", context(request, logs=rows, q=q, level=level))
+
+    @application.get("/decisions", response_class=HTMLResponse)
+    def decisions_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "decisions.html",
+            context(request, decisions=list_ai_decisions()),
+        )
+
+    @application.get("/decisions/{decision_id}", response_class=HTMLResponse)
+    def decision_detail(request: Request, decision_id: str) -> HTMLResponse:
+        detail = get_ai_decision(decision_id)
+        if detail is None:
+            raise HTTPException(status_code=404, detail="AI decision not found")
+        return templates.TemplateResponse(
+            request,
+            "decision_detail.html",
+            context(request, **detail),
+        )
+
+    @application.get("/cases", response_class=HTMLResponse)
+    def cases_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "cases.html",
+            context(request, cases=list_business_cases()),
+        )
+
+    @application.get("/cases/{case_id}", response_class=HTMLResponse)
+    def case_detail(request: Request, case_id: str) -> HTMLResponse:
+        detail = get_business_case(case_id)
+        if detail is None:
+            raise HTTPException(status_code=404, detail="business case not found")
+        card_body = _read_text(active, detail["case"].card_body_path)
+        return templates.TemplateResponse(
+            request,
+            "case_detail.html",
+            context(request, **detail, card_body=card_body),
+        )
+
+    @application.get("/prompts", response_class=HTMLResponse)
+    def prompts_page(request: Request, file: str = "") -> HTMLResponse:
+        bundle = build_prompt_bundle()
+        selected = next((item for item in bundle.files if item.path == file), None)
+        if selected is None and bundle.files:
+            selected = bundle.files[0]
+        return templates.TemplateResponse(
+            request,
+            "prompts.html",
+            context(request, bundle=bundle, selected=selected),
+        )
+
+    @application.get("/outbox", response_class=HTMLResponse)
+    def outbox_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "outbox.html",
+            context(
+                request,
+                rows=list_outbox(),
+                discord_mode=active.discord_mode,
+            ),
+        )
 
     return application
 

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}업무 · 풍멜이{% endblock %}
+{% block heading %}업무{% endblock %}
+{% block content %}
+<section class="hero compact"><div><span class="pulse"></span>메일 한 건은 업무 하나에만 연결</div><strong>신규·갱신과 현재 카드 상태를 확인합니다</strong></section>
+<section class="panel table-wrap"><table>
+  <thead><tr><th>최근 갱신</th><th>업무</th><th>카테고리</th><th>상태</th><th>업체</th><th>Revision</th><th>알림 채널</th></tr></thead>
+  <tbody>{% for case in cases %}<tr>
+    <td>{{ case.updated_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+    <td><a href="/cases/{{ case.id }}">{{ case.subject }}</a><small>{{ case.case_key }}</small></td>
+    <td><span class="category-badge">{{ case.category }}</span></td><td><span class="pill {{ case.status|lower }}">{{ case.status }}</span></td>
+    <td>{{ case.company or '-' }}</td><td>{{ case.current_revision }}</td><td>{{ case.card_channel_key or '-' }}</td>
+  </tr>{% else %}<tr><td colspan="7">아직 생성된 업무가 없습니다.</td></tr>{% endfor %}</tbody>
+</table></section>
+{% endblock %}

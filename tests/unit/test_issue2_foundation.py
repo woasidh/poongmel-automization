@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -65,6 +64,13 @@ def test_structured_output_rejects_category_payload_mismatch() -> None:
         MailDecision.model_validate(payload)
 
 
+def test_openai_schema_uses_supported_union_shape() -> None:
+    schema = MailDecision.model_json_schema()
+    payload_schema = schema["properties"]["category_payload"]
+    assert "oneOf" not in payload_schema
+    assert len(payload_schema["anyOf"]) == 7
+
+
 def test_prompt_manifest_is_deterministic_and_complete() -> None:
     first = build_prompt_bundle()
     second = build_prompt_bundle()
@@ -95,12 +101,8 @@ class FakeResponse:
     def __init__(self) -> None:
         self.output_parsed = MailDecision.model_validate(sample_decision())
 
-    def model_dump_json(self, **kwargs) -> str:  # noqa: ANN003
-        return json.dumps(
-            {"id": self.id, "output": self.output_parsed.model_dump(mode="json")},
-            ensure_ascii=False,
-            indent=2,
-        )
+    def model_dump(self, **kwargs):  # noqa: ANN003, ANN201
+        return {"id": self.id, "output": self.output_parsed.model_dump(mode="json")}
 
 
 class FakeResponses:
