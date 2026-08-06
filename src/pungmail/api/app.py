@@ -26,6 +26,7 @@ from pungmail.repositories.queries import (
     list_ai_decisions,
     list_business_cases,
     list_outbox,
+    list_run_mails,
     list_runs,
     parse_json,
 )
@@ -34,6 +35,7 @@ from pungmail.workflows.graph import WORKFLOW_GRAPHS
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
+templates.env.policies["json.dumps_kwargs"]["ensure_ascii"] = False
 
 NODE_STATUS_LABELS = {
     "PENDING": "실행 안 함",
@@ -116,6 +118,7 @@ def _build_run_graph(workflow_type: str, node_runs: list[Any]) -> dict[str, Any]
         nodes.append(
             {
                 "key": definition.key,
+                "dom_id": f"step-{len(nodes) + 1}",
                 "label": definition.label,
                 "stage": definition.stage,
                 "branch": definition.branch,
@@ -153,6 +156,7 @@ def _build_run_graph(workflow_type: str, node_runs: list[Any]) -> dict[str, Any]
         "router": router,
         "branches": branches,
         "tail_nodes": tail_nodes,
+        "all_nodes": nodes,
     }
 
 
@@ -217,11 +221,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "업무 DB": {"status": "정상", "ok": True},
             "Prefect": _prefect_health(active),
             "Gmail 조회": {
-                "status": "설정됨" if active.gmail_enabled else "꺼짐",
-                "ok": active.gmail_enabled and active.gmail_token_path.exists(),
+                "status": (
+                    "자동 조회 켜짐"
+                    if active.mail_schedule_enabled
+                    else "자동 조회 꺼짐"
+                ),
+                "ok": (
+                    not active.mail_schedule_enabled
+                    or (active.gmail_enabled and active.gmail_token_path.exists())
+                ),
             },
         }
-        next_mail = datetime.now(UTC) + timedelta(seconds=active.mail_check_interval_seconds)
+        next_mail = (
+            datetime.now(UTC) + timedelta(seconds=active.mail_check_interval_seconds)
+            if active.mail_schedule_enabled and active.gmail_enabled
+            else None
+        )
         return templates.TemplateResponse(
             request,
             "dashboard.html",
@@ -230,8 +245,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @application.get("/workflows", response_class=HTMLResponse)
     def workflows(request: Request) -> HTMLResponse:
+        if active.mail_schedule_enabled:
+            seconds = active.mail_check_interval_seconds
+            mail_schedule = (
+                f"{seconds // 60}분마다" if seconds % 60 == 0 else f"{seconds}초마다"
+            )
+        else:
+            mail_schedule = "자동 실행 꺼짐"
         rows = [
-            {"key": "mail_processing", "name": "메일 처리", "schedule": "1분마다", "description": "지메일 수집부터 카테고리 분기까지", "nodes": len(WORKFLOW_GRAPHS["mail_processing"])},
+            {"key": "mail_processing", "name": "메일 처리", "schedule": mail_schedule, "description": "지메일 수집부터 카테고리 분기까지", "nodes": len(WORKFLOW_GRAPHS["mail_processing"])},
             {"key": "order_status_refresh", "name": "오더시트·재고 갱신", "schedule": "1시간마다", "description": "이슈 1에서는 실행 가능한 골격", "nodes": len(WORKFLOW_GRAPHS["order_status_refresh"])},
         ]
         return templates.TemplateResponse(request, "workflows.html", context(request, workflows=rows))
@@ -259,10 +281,107 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     @application.get("/runs/{run_id}", response_class=HTMLResponse)
-    def run_detail(request: Request, run_id: str) -> HTMLResponse:
+    def run_detail(
+        request: Request,
+        run_id: str,
+        mail: str = "",
+        node: str = "",
+    ) -> HTMLResponse:
         run, nodes = get_run(run_id)
         if run is None:
             raise HTTPException(status_code=404, detail="run not found")
+
+        run_mails = list_run_mails(run_id)
+        selected_mail = next(
+            ((event, message) for event, message in run_mails if event.id == mail),
+            run_mails[0] if run_mails else None,
+        )
+        selected_event = selected_mail[0] if selected_mail else None
+        selected_message = selected_mail[1] if selected_mail else None
+        scoped_nodes = [
+            item
+            for item in nodes
+            if item.mail_event_id is None
+            or (selected_event is not None and item.mail_event_id == selected_event.id)
+        ]
+        graph = _build_run_graph(run.workflow_type, scoped_nodes)
+        available_keys = {
+            item["key"] for item in graph["all_nodes"] if item["record_count"]
+        }
+        selected_node = next(
+            (
+                item["key"]
+                for item in graph["all_nodes"]
+                if item["record_count"] and node in {item["key"], item["dom_id"]}
+            ),
+            "",
+        )
+        if not selected_node:
+            failed = next(
+                (
+                    item["key"]
+                    for item in graph["all_nodes"]
+                    if item["record_count"] and item["status"] == "FAILED"
+                ),
+                "",
+            )
+            mail_node = next(
+                (
+                    item.node_key
+                    for item in scoped_nodes
+                    if selected_event is not None
+                    and item.mail_event_id == selected_event.id
+                    and item.status != "SKIPPED"
+                ),
+                "",
+            )
+            selected_node = failed or mail_node or next(iter(available_keys), "")
+
+        detail_context: dict[str, Any] = {
+            "mail_detail": None,
+            "thread_views": [],
+            "attachment_views": [],
+            "decision_detail": None,
+            "case_detail": None,
+            "card_body": "",
+        }
+        if selected_message is not None:
+            mail_detail_data = get_mail_detail(selected_message.message_id)
+            if mail_detail_data is not None:
+                detail_context.update(
+                    {
+                        "mail_detail": mail_detail_data,
+                        "thread_views": [
+                            {
+                                "row": message,
+                                "actual_body": _read_text(active, message.actual_body_path),
+                                "quoted_body": _read_text(active, message.quoted_body_path),
+                            }
+                            for message in mail_detail_data["thread_messages"]
+                        ],
+                        "attachment_views": [
+                            {
+                                "row": attachment,
+                                "extracted_text": _read_text(
+                                    active, attachment.extracted_text_path
+                                ),
+                                "ocr_text": _read_text(active, attachment.ocr_text_path),
+                            }
+                            for attachment in mail_detail_data["attachments"]
+                        ],
+                    }
+                )
+            if selected_event and selected_event.ai_decision_id:
+                detail_context["decision_detail"] = get_ai_decision(
+                    selected_event.ai_decision_id
+                )
+            if selected_event and selected_event.business_case_id:
+                case_detail_data = get_business_case(selected_event.business_case_id)
+                detail_context["case_detail"] = case_detail_data
+                if case_detail_data is not None:
+                    detail_context["card_body"] = _read_text(
+                        active, case_detail_data["case"].card_body_path
+                    )
         return templates.TemplateResponse(
             request,
             "run_detail.html",
@@ -272,8 +391,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 workflow_name=WORKFLOW_LABELS.get(run.workflow_type, run.workflow_type),
                 selected_run_status_label=RUN_STATUS_LABELS.get(run.status, "상태 확인 필요"),
                 selected_trigger_label=TRIGGER_LABELS.get(run.trigger_type, "실행 방식 확인 필요"),
-                graph=_build_run_graph(run.workflow_type, nodes),
-                node_record_count=len(nodes),
+                graph=graph,
+                node_record_count=len(scoped_nodes),
+                run_mails=run_mails,
+                selected_event=selected_event,
+                selected_message=selected_message,
+                selected_node=selected_node,
+                **detail_context,
             ),
         )
 

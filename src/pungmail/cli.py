@@ -22,6 +22,10 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("db-upgrade", help="업무 DB를 최신 스키마로 올립니다.")
     commands.add_parser("gmail-check", help="Gmail 조회 인증과 history ID만 확인합니다.")
+    commands.add_parser(
+        "sync-mail-schedule",
+        help="설정에 맞춰 Gmail 자동 조회 주기를 켜거나 끕니다.",
+    )
     commands.add_parser("run-mail-once", help="메일 처리 워크플로를 한 번 실행합니다.")
     commands.add_parser("run-order-refresh", help="시간별 갱신 골격을 한 번 실행합니다.")
     commands.add_parser("seed-demo", help="UI 검수용 메일 한 건을 만듭니다.")
@@ -43,6 +47,15 @@ def main() -> None:
 
         history_id = GmailReadOnlyClient(settings).current_history_id()
         print(f"Gmail read-only connection OK; history id length={len(history_id)}")
+    elif args.command == "sync-mail-schedule":
+        from pungmail.services.schedules import sync_mail_schedule
+
+        result = sync_mail_schedule(settings)
+        state = "enabled" if result["enabled"] else "disabled"
+        print(
+            f"Mail schedule {state}; interval={result['interval_seconds']}s; "
+            f"cancelled_runs={result['cancelled_runs']}"
+        )
     elif args.command == "run-mail-once":
         from pungmail.workflows.mail_processing import mail_processing
 

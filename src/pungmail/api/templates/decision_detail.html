@@ -20,9 +20,20 @@
       <dt>근거 SHA</dt><dd class="mono">{{ decision.evidence_bundle_sha256 }}</dd>
     </dl>
   </section>
-  <section class="panel"><div class="panel-head"><h2>프롬프트 기록</h2></div>
-    <dl class="detail-list"><dt>버전</dt><dd>{{ decision.prompt_version }}</dd><dt>Bundle SHA</dt><dd class="mono">{{ decision.prompt_bundle_sha256 }}</dd></dl>
-    <pre class="json-box">{{ parse_json(decision.prompt_manifest_json, {}) | tojson(indent=2) }}</pre>
+  <section class="panel"><div class="panel-head"><h2>사용한 프롬프트</h2></div>
+    <dl class="detail-list"><dt>버전</dt><dd>{{ decision.prompt_version }}</dd><dt>실행 SHA</dt><dd class="mono">{{ decision.prompt_bundle_sha256 }}</dd></dl>
+    {% set prompt_manifest = parse_json(decision.prompt_manifest_json, {}) %}
+    {% if prompt_manifest.stages %}
+      {% for stage in prompt_manifest.stages %}
+        <div class="history-row">
+          <strong>{{ '카테고리 판정' if stage.stage == 'CATEGORY_CLASSIFICATION' else '카테고리 업무값 추출' }}</strong>
+          {% if stage.category %}<span class="category-badge">{{ stage.category }}</span>{% endif %}
+          {% for file in stage.files %}<div class="evidence-row"><span>{{ file.path }}</span><code>{{ file.sha256 }}</code></div>{% endfor %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <pre class="json-box">{{ prompt_manifest | tojson(indent=2) }}</pre>
+    {% endif %}
   </section>
 </div>
 {% if decision.error_message %}<section class="notice warning"><strong>{{ decision.error_type }}</strong> · {{ decision.error_message }}</section>{% endif %}

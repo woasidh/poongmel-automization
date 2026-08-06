@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     discord_test_webhooks_json: str = "{}"
     outbox_max_attempts: int = Field(default=5, ge=1, le=20)
 
+    mail_schedule_enabled: bool = False
     mail_check_interval_seconds: int = Field(default=60, ge=10, le=3600)
     max_messages_per_run: int = Field(default=25, ge=1, le=200)
     history_page_size: int = Field(default=100, ge=1, le=500)

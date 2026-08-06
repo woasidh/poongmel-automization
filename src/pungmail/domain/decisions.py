@@ -26,6 +26,10 @@ class CaseAction(StrEnum):
     UPDATE = "UPDATE"
 
 
+class MailClassification(StrictModel):
+    category: Category
+
+
 class CaseLookupKeys(StrictModel):
     original_message_id: str | None
     thread_id: str | None

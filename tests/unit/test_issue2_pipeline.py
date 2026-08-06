@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from sqlalchemy import select
 
 from pungmail.repositories.database import session_scope
@@ -46,6 +48,14 @@ def test_ai_failure_is_persisted_and_becomes_hold(isolated_settings) -> None:
         assert stored is not None
         assert stored.status == "FAILED_TO_HOLD"
         assert stored.error_type == "TimeoutError"
+        prompt_manifest = json.loads(stored.prompt_manifest_json)
+        assert [stage["stage"] for stage in prompt_manifest["stages"]] == [
+            "CATEGORY_CLASSIFICATION"
+        ]
+        assert [item["path"] for item in prompt_manifest["stages"][0]["files"]] == [
+            "common.md",
+            "classification.md",
+        ]
 
 
 def test_router_runs_only_selected_category_branch(isolated_settings) -> None:

@@ -2,7 +2,7 @@
 {% block title %}대시보드 · 풍멜이{% endblock %}
 {% block heading %}운영 대시보드{% endblock %}
 {% block content %}
-<section class="hero"><div><span class="pulse"></span> 메일 수집 플랫폼 상태</div><strong>다음 확인 예상 {{ next_mail.strftime('%H:%M:%S') }}</strong></section>
+<section class="hero"><div><span class="pulse"></span> 메일 수집 플랫폼 상태</div><strong>{% if next_mail %}다음 확인 예상 {{ next_mail.strftime('%H:%M:%S') }}{% else %}자동 메일 조회 꺼짐{% endif %}</strong></section>
 <section class="metrics">
   <article><span>24시간 실행</span><strong>{{ data.run_count }}</strong></article>
   <article><span>정상 완료</span><strong class="success-text">{{ data.success_count }}</strong></article>

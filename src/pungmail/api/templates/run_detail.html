@@ -3,32 +3,21 @@
 {% block heading %}실행 상세{% endblock %}
 
 {% macro node_card(node, extra_class='') %}
-<article class="flow-node run-flow-node status-{{ node.status|lower }} {{ extra_class }}">
-  <div class="run-node-head">
+<button
+  type="button"
+  class="flow-node run-flow-node status-{{ node.status|lower }} {{ extra_class }} {{ 'selected' if selected_node == node.key }}"
+  data-node-id="{{ node.dom_id }}"
+  aria-controls="node-panel-{{ node.dom_id }}"
+  aria-pressed="{{ 'true' if selected_node == node.key else 'false' }}"
+>
+  <span class="run-node-head">
     <span class="run-node-state"><i></i>{{ node.status_label }}</span>
     {% if node.record_count > 1 %}<em>{{ node.record_count }}건</em>{% endif %}
-  </div>
+  </span>
   <strong>{{ node.label }}</strong>
   <small>{{ node.duration }}</small>
-  {% if node.error %}<p class="run-node-error">{{ node.error }}</p>{% endif %}
-  {% if node.records %}
-  <details class="run-node-details">
-    <summary>실행 기록 보기</summary>
-    {% for record in node.records %}
-    <div class="run-node-record">
-      <b>{{ loop.index }}번째 · {{ record.status_label }}</b>
-      <span>{{ record.time }}</span>
-      {% if record.error %}<p>{{ record.error }}</p>{% endif %}
-      <pre>입력
-{{ record.input }}
-
-출력
-{{ record.output }}</pre>
-    </div>
-    {% endfor %}
-  </details>
-  {% endif %}
-</article>
+  {% if node.error %}<span class="run-node-error">{{ node.error }}</span>{% endif %}
+</button>
 {% endmacro %}
 
 {% block content %}
@@ -39,43 +28,190 @@
   <div><span>시작</span><strong>{{ run.started_at_utc.strftime('%Y-%m-%d %H:%M:%S') }}</strong></div>
 </section>
 
-<section class="panel run-graph-panel">
-  <div class="panel-head"><h2>실행된 노드 흐름</h2><span>실행 기록 {{ node_record_count }}건</span></div>
-  <div class="run-legend" aria-label="노드 상태 범례">
-    <span class="status-succeeded"><i></i>정상 완료</span>
-    <span class="status-running"><i></i>실행 중</span>
-    <span class="status-failed"><i></i>실패</span>
-    <span class="status-retry_wait"><i></i>재시도 대기</span>
-    <span class="status-skipped"><i></i>건너뜀</span>
-    <span class="status-pending"><i></i>실행 안 함</span>
-  </div>
-
-  <div class="flow-rows run-flow-rows">
-    {% for row in graph.common_nodes|batch(4) %}
-    <div class="common-flow">{% for node in row %}{{ node_card(node) }}{% endfor %}</div>
-    {% if not loop.last %}<div class="flow-down" aria-hidden="true">↓</div>{% endif %}
+{% if run_mails %}
+<section class="panel run-mail-selector">
+  <div class="panel-head"><h2>처리한 메일</h2><span>{{ run_mails|length }}건 · 메일을 선택하면 해당 노드 흐름을 표시합니다</span></div>
+  <div class="run-mail-tabs">
+    {% for event, message in run_mails %}
+    <a class="run-mail-tab {{ 'active' if selected_event and selected_event.id == event.id }}" href="/runs/{{ run.id }}?mail={{ event.id }}">
+      <span>
+        <strong>{{ message.subject or '(수집 대기)' }}</strong>
+        <small>{{ message.sender or message.message_id }}</small>
+      </span>
+      <span class="pill {{ event.status|lower }}">{{ event.status }}</span>
+    </a>
     {% endfor %}
   </div>
+</section>
+{% endif %}
 
-  {% if graph.router %}
-  <div class="run-router-wrap">{{ node_card(graph.router, 'run-router-node') }}</div>
-  {% endif %}
+<div class="run-workspace">
+  <section class="panel run-graph-panel">
+    <div class="panel-head"><h2>{{ '선택 메일의 노드 흐름' if selected_message else '실행된 노드 흐름' }}</h2><span>실행 기록 {{ node_record_count }}건</span></div>
+    {% if selected_message %}
+    <div class="selected-mail-summary">
+      <span class="category-badge">{{ selected_event.event_action or '처리 중' }}</span>
+      <strong>{{ selected_message.subject or '(수집 대기)' }}</strong>
+      <small>{{ selected_message.sender or selected_message.message_id }} · thread {{ selected_message.thread_id }}</small>
+    </div>
+    {% endif %}
+    <div class="run-legend" aria-label="노드 상태 범례">
+      <span class="status-succeeded"><i></i>정상 완료</span>
+      <span class="status-running"><i></i>실행 중</span>
+      <span class="status-failed"><i></i>실패</span>
+      <span class="status-retry_wait"><i></i>재시도 대기</span>
+      <span class="status-skipped"><i></i>건너뜀</span>
+      <span class="status-pending"><i></i>실행 안 함</span>
+    </div>
 
-  {% if graph.branches %}
-  <div class="branch-grid run-branch-grid">
-    {% for branch in graph.branches %}
-    <section class="branch-column {{ 'active' if branch.active else '' }}">
-      <h3>{{ branch.name }}</h3>
-      {% for node in branch.nodes %}{{ node_card(node, 'branch') }}{% endfor %}
+    <div class="flow-rows run-flow-rows">
+      {% for row in graph.common_nodes|batch(4) %}
+      <div class="common-flow">{% for item in row %}{{ node_card(item) }}{% endfor %}</div>
+      {% if not loop.last %}<div class="flow-down" aria-hidden="true">↓</div>{% endif %}
+      {% endfor %}
+    </div>
+
+    {% if graph.router %}<div class="run-router-wrap">{{ node_card(graph.router, 'run-router-node') }}</div>{% endif %}
+
+    {% if graph.branches %}
+    <div class="branch-grid run-branch-grid">
+      {% for branch in graph.branches %}
+      <section class="branch-column {{ 'active' if branch.active else '' }}">
+        <h3>{{ branch.name }}</h3>
+        {% for item in branch.nodes %}{{ node_card(item, 'branch') }}{% endfor %}
+      </section>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if graph.tail_nodes %}
+    <div class="common-flow tail run-tail">{% for item in graph.tail_nodes %}{{ node_card(item) }}{% endfor %}</div>
+    {% endif %}
+  </section>
+
+  <aside class="panel run-inspector" aria-live="polite">
+    <div class="panel-head"><h2>노드 결과</h2><span>노드를 클릭해 확인</span></div>
+    {% if not selected_node %}<div class="empty">결과를 확인할 노드를 선택하세요.</div>{% endif %}
+
+    {% for item in graph.all_nodes %}
+    <section id="node-panel-{{ item.dom_id }}" class="node-inspector-panel" data-node-panel="{{ item.dom_id }}" {% if selected_node != item.key %}hidden{% endif %}>
+      <header class="inspector-title">
+        <div><span>{{ item.stage|upper }}</span><h3>{{ item.label }}</h3></div>
+        <span class="pill {{ item.status|lower }}">{{ item.status_label }}</span>
+      </header>
+
+      {% for record in item.records %}
+      <article class="inspector-record">
+        <div class="inspector-record-head"><strong>{{ loop.index }}번째 시도</strong><span>{{ record.time }}</span></div>
+        {% if record.error %}<div class="notice warning">{{ record.error }}</div>{% endif %}
+        <details open>
+          <summary>입력값</summary>
+          <pre class="json-box">{{ parse_json(record.input, {}) | tojson(indent=2) }}</pre>
+        </details>
+        <details open>
+          <summary>결과값</summary>
+          <pre class="json-box">{{ parse_json(record.output, {}) | tojson(indent=2) }}</pre>
+        </details>
+      </article>
+      {% else %}
+      <div class="empty">이 메일에서 실행된 기록이 없습니다.</div>
+      {% endfor %}
+
+      {% if item.key == 'extract_evidence' and mail_detail %}
+      <div class="inspector-section">
+        <h4>메일·첨부 근거</h4>
+        {% for thread in thread_views %}
+        <details class="inspector-evidence" {{ 'open' if loop.last }}>
+          <summary>{{ thread.row.sender or '-' }} · {{ thread.row.subject }}</summary>
+          <pre>{{ thread.actual_body or '(분리된 작성문 없음)' }}</pre>
+          {% if thread.quoted_body %}<details><summary>인용된 이전 내용</summary><pre>{{ thread.quoted_body }}</pre></details>{% endif %}
+        </details>
+        {% endfor %}
+        {% for attachment in attachment_views %}
+        <details class="inspector-evidence">
+          <summary>{{ attachment.row.file_name }} · {{ attachment.row.extraction_status }}</summary>
+          {% if attachment.extracted_text %}<pre>{{ attachment.extracted_text }}</pre>{% endif %}
+          {% if attachment.ocr_text %}<pre>{{ attachment.ocr_text }}</pre>{% endif %}
+        </details>
+        {% else %}<p class="muted-copy">첨부파일이 없습니다.</p>{% endfor %}
+      </div>
+      {% endif %}
+
+      {% if item.key == 'classify_and_extract' and decision_detail %}
+      {% set decision = decision_detail.decision %}
+      {% set prompt_manifest = parse_json(decision.prompt_manifest_json, {}) %}
+      <div class="inspector-section">
+        <h4>AI 판정</h4>
+        <div class="inspector-metrics">
+          <div><span>카테고리</span><strong>{{ decision.category }}</strong></div>
+          <div><span>업무 제안</span><strong>{{ decision.case_action }}</strong></div>
+          <div><span>모델</span><strong>{{ decision.model_id }}</strong></div>
+          <div><span>토큰</span><strong>{{ decision.input_tokens or '-' }} / {{ decision.output_tokens or '-' }}</strong></div>
+        </div>
+        <details open><summary>구조화 결과</summary><pre class="json-box">{{ parse_json(decision.parsed_payload_json, {}) | tojson(indent=2) }}</pre></details>
+        <details><summary>사용한 프롬프트</summary>
+          {% if prompt_manifest.stages %}
+            {% for stage in prompt_manifest.stages %}
+            <div class="prompt-stage"><strong>{{ '카테고리 판정' if stage.stage == 'CATEGORY_CLASSIFICATION' else '카테고리 업무값 추출' }}</strong>{% if stage.category %}<span>{{ stage.category }}</span>{% endif %}
+              {% for file in stage.files %}<div class="evidence-row"><span>{{ file.path }}</span><code>{{ file.sha256 }}</code></div>{% endfor %}
+            </div>
+            {% endfor %}
+          {% else %}<pre class="json-box">{{ prompt_manifest | tojson(indent=2) }}</pre>{% endif %}
+        </details>
+      </div>
+      {% endif %}
+
+      {% if (item.key == 'resolve_case' or item.stage == 'branch') and case_detail %}
+      {% set business = case_detail.case %}
+      <div class="inspector-section">
+        <h4>진행 업무</h4>
+        <div class="inspector-metrics">
+          <div><span>업무키</span><strong>{{ business.case_key }}</strong></div>
+          <div><span>상태</span><strong>{{ business.status }}</strong></div>
+          <div><span>카테고리</span><strong>{{ business.category }}</strong></div>
+          <div><span>Revision</span><strong>{{ business.current_revision }}</strong></div>
+        </div>
+        <p class="inspector-summary">{{ business.summary }}</p>
+        <details open><summary>현재 업무값</summary><pre class="json-box">{{ parse_json(business.payload_json, {}) | tojson(indent=2) }}</pre></details>
+        <details><summary>정확 연결값</summary>{% for key in case_detail['keys'] %}<div class="evidence-row"><strong>{{ key.key_type }}</strong><code>{{ key.key_value }}</code></div>{% else %}<p class="muted-copy">연결값이 없습니다.</p>{% endfor %}</details>
+        <details><summary>Revision 변경 이력</summary>{% for history in case_detail.history %}<div class="history-row"><strong>Revision {{ history.revision }} · {{ history.change_summary }}</strong><pre class="json-box">{{ parse_json(history.after_json, {}) | tojson(indent=2) }}</pre></div>{% endfor %}</details>
+        <a class="inspector-link" href="/cases/{{ business.id }}">진행 업무 전체 보기 →</a>
+      </div>
+      {% endif %}
+
+      {% if item.key == 'render_discord' and case_detail %}
+      <div class="inspector-section"><h4>Discord 카드</h4><pre class="discord-preview">{{ card_body or '아직 카드가 만들어지지 않았습니다.' }}</pre></div>
+      {% endif %}
+
+      {% if item.key in ['dispatch_outbox', 'finalize_case'] and case_detail %}
+      <div class="inspector-section">
+        <h4>알림 처리</h4>
+        {% for outbox in case_detail.outbox %}
+        <div class="outbox-result"><strong>{{ outbox.operation }} · {{ outbox.target_channel_key }}</strong><span class="pill {{ outbox.status|lower }}">{{ outbox.status }}</span><small>시도 {{ outbox.attempt_count }}회{% if outbox.last_error %} · {{ outbox.last_error }}{% endif %}</small></div>
+        {% else %}<p class="muted-copy">알림 작업이 없습니다.</p>{% endfor %}
+      </div>
+      {% endif %}
     </section>
     {% endfor %}
-  </div>
-  {% endif %}
+  </aside>
+</div>
 
-  {% if graph.tail_nodes %}
-  <div class="common-flow tail run-tail">
-    {% for node in graph.tail_nodes %}{{ node_card(node) }}{% endfor %}
-  </div>
-  {% endif %}
-</section>
+<script>
+(() => {
+  const buttons = Array.from(document.querySelectorAll('[data-node-id]'));
+  const panels = Array.from(document.querySelectorAll('[data-node-panel]'));
+  const activate = (key) => {
+    buttons.forEach((button) => {
+      const active = button.dataset.nodeId === key;
+      button.classList.toggle('selected', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    panels.forEach((panel) => { panel.hidden = panel.dataset.nodePanel !== key; });
+    const url = new URL(window.location.href);
+    url.searchParams.set('node', key);
+    window.history.replaceState({}, '', url);
+  };
+  buttons.forEach((button) => button.addEventListener('click', () => activate(button.dataset.nodeId)));
+})();
+</script>
 {% endblock %}

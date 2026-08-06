@@ -53,6 +53,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Prefect work-pool setup failed with exit code $LASTEXITCODE." }
     & $prefectPath deploy --all
     if ($LASTEXITCODE -ne 0) { throw "Prefect deployment failed with exit code $LASTEXITCODE." }
+    & $pythonPath -m pungmail.cli sync-mail-schedule
+    if ($LASTEXITCODE -ne 0) { throw "Mail schedule sync failed with exit code $LASTEXITCODE." }
 
     $worker = Start-Process -FilePath $prefectPath -ArgumentList @("worker","start","--pool","pungmail-local") -WorkingDirectory $projectRoot -RedirectStandardOutput (Join-Path $logPath "prefect-worker.stdout.log") -RedirectStandardError (Join-Path $logPath "prefect-worker.stderr.log") -WindowStyle Hidden -PassThru
     $ui = Start-Process -FilePath $pythonPath -ArgumentList @("-m","pungmail.cli","serve-ui","--host","127.0.0.1","--port","8000") -WorkingDirectory $projectRoot -RedirectStandardOutput (Join-Path $logPath "ui.stdout.log") -RedirectStandardError (Join-Path $logPath "ui.stderr.log") -WindowStyle Hidden -PassThru

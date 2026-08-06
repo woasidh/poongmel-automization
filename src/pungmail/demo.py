@@ -14,7 +14,12 @@ from pungmail.adapters.gmail.parser import hard_exclusion_reason
 from pungmail.config import get_settings
 from pungmail.adapters.openai_decision import DecisionResult
 from pungmail.domain.decisions import MailDecision
-from pungmail.prompts import build_prompt_bundle
+from pungmail.prompts import (
+    PromptStage,
+    build_category_prompt_bundle,
+    build_classification_prompt_bundle,
+    build_prompt_trace,
+)
 from pungmail.repositories.ai_store import save_ai_success
 from pungmail.repositories.cases import apply_decision
 from pungmail.repositories.database import session_scope
@@ -229,7 +234,17 @@ def seed_issue2_demo() -> str:
         with TrackedNode(run_id, "lookup_catalog", mail_event_id=event.id) as node:
             node.set_output({"candidate_count": len(candidates), "matched": "VC-IP"})
         decision = _issue2_decision(message_id, thread_id, completed=completed)
-        bundle = build_prompt_bundle()
+        prompt_trace = build_prompt_trace(
+            PromptStage(
+                name="CATEGORY_CLASSIFICATION",
+                bundle=build_classification_prompt_bundle(),
+            ),
+            PromptStage(
+                name="CATEGORY_PROCESSING",
+                category=decision.category.value,
+                bundle=build_category_prompt_bundle(decision.category),
+            ),
+        )
         raw_path = settings.ai_response_path / f"demo-response-{suffix}-{revision}.json"
         raw_path.parent.mkdir(parents=True, exist_ok=True)
         raw_json = json.dumps(decision.model_dump(mode="json"), ensure_ascii=False, indent=2)
@@ -242,7 +257,7 @@ def seed_issue2_demo() -> str:
             output_tokens=180,
             raw_response_path=str(raw_path.relative_to(settings.project_root)),
             raw_response_sha256=sha256(raw_json.encode("utf-8")).hexdigest(),
-            prompt_bundle=bundle,
+            prompt_trace=prompt_trace,
         )
         decision_id = save_ai_success(
             event.id,

@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import select
 
 from pungmail.adapters.catalog import CompanyCatalog
-from pungmail.adapters.openai_decision import OpenAIMailDecisionClient
+from pungmail.adapters.openai_decision import DecisionStageError, OpenAIMailDecisionClient
 from pungmail.config import Settings, get_settings
 from pungmail.domain.decisions import (
     CatalogItemInput,
@@ -21,7 +21,11 @@ from pungmail.domain.decisions import (
     SampleDocumentQuotePayload,
     UpstreamOrderPayload,
 )
-from pungmail.prompts import build_prompt_bundle
+from pungmail.prompts import (
+    PromptStage,
+    build_classification_prompt_bundle,
+    build_prompt_trace,
+)
 from pungmail.repositories.ai_store import save_ai_failure, save_ai_success
 from pungmail.repositories.database import session_scope
 from pungmail.repositories.models import (
@@ -537,13 +541,30 @@ def decide_mail(
         )
         return result.decision, decision_id, None
     except Exception as exc:
-        hold = failure_hold_decision(evidence, exc)
+        if isinstance(exc, DecisionStageError):
+            failure = exc.original_error
+            failure_node = exc.stage.casefold()
+            prompt_trace = exc.prompt_trace
+        else:
+            failure = exc
+            failure_node = "category_classification"
+            prompt_trace = build_prompt_trace(
+                PromptStage(
+                    name="CATEGORY_CLASSIFICATION",
+                    bundle=build_classification_prompt_bundle(),
+                )
+            )
+        hold = failure_hold_decision(
+            evidence,
+            failure,
+            failure_node=failure_node,
+        )
         decision_id = save_ai_failure(
             mail_event_id,
-            exc,
+            failure,
             evidence,
-            build_prompt_bundle(),
+            prompt_trace,
             hold,
             reasoning_effort=active.openai_reasoning_effort,
         )
-        return hold, decision_id, f"{type(exc).__name__}: {exc}"
+        return hold, decision_id, f"{type(failure).__name__}: {failure}"

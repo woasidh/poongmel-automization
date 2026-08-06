@@ -107,6 +107,18 @@ def get_run(run_id: str) -> tuple[WorkflowRun | None, list[NodeRun]]:
         return run, list(nodes)
 
 
+def list_run_mails(run_id: str) -> list[tuple[MailEvent, GmailMessage]]:
+    with session_scope() as session:
+        rows = session.execute(
+            select(MailEvent, GmailMessage)
+            .join(GmailMessage, MailEvent.gmail_message_id == GmailMessage.message_id)
+            .where(MailEvent.workflow_run_id == run_id)
+            .order_by(MailEvent.created_at_utc.asc())
+        ).all()
+        session.expunge_all()
+        return list(rows)
+
+
 def list_mails(status: str = "", query: str = "", limit: int = 200) -> list[tuple[MailEvent, GmailMessage]]:
     with session_scope() as session:
         statement = (

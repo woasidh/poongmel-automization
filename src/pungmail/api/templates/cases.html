@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}업무 · 풍멜이{% endblock %}
-{% block heading %}업무{% endblock %}
+{% block title %}진행 업무 · 풍멜이{% endblock %}
+{% block heading %}진행 업무{% endblock %}
 {% block content %}
-<section class="hero compact"><div><span class="pulse"></span>메일 한 건은 업무 하나에만 연결</div><strong>신규·갱신과 현재 카드 상태를 확인합니다</strong></section>
+<section class="hero compact"><div><span class="pulse"></span>여러 실행에 걸쳐 이어지는 업무의 현재 상태</div><strong>최신 상태와 Revision, 알림 채널을 확인합니다</strong></section>
 <section class="panel table-wrap"><table>
   <thead><tr><th>최근 갱신</th><th>업무</th><th>카테고리</th><th>상태</th><th>업체</th><th>Revision</th><th>알림 채널</th></tr></thead>
   <tbody>{% for case in cases %}<tr>

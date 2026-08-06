@@ -4,9 +4,19 @@ from importlib import import_module
 
 from fastapi.testclient import TestClient
 
-from pungmail.api.app import create_app
+from pungmail.api.app import create_app, templates
 from pungmail.repositories.mail_store import enqueue_messages
 from pungmail.repositories.tracking import TrackedNode, create_workflow_run, finish_workflow_run
+
+
+def test_json_views_render_korean_without_unicode_escapes() -> None:
+    rendered = templates.env.from_string("{{ value | tojson(indent=2) }}").render(
+        value={"category": "해외업무", "summary": "일정 확인 요청"}
+    )
+
+    assert '"category": "해외업무"' in rendered
+    assert '"summary": "일정 확인 요청"' in rendered
+    assert "\\ud574\\uc678\\uc5c5\\ubb34" not in rendered
 
 
 def test_management_pages_render_observable_run(isolated_settings, monkeypatch) -> None:
@@ -47,7 +57,14 @@ def test_management_pages_render_observable_run(isolated_settings, monkeypatch) 
         ("/runs", ("실행 이력",)),
         (
             f"/runs/{run_id}",
-            ("실행된 노드 흐름", "지메일 새 메일 조회", "발주 기본정보 구조화", "정상 완료"),
+            (
+                "처리한 메일",
+                "선택 메일의 노드 흐름",
+                "노드 결과",
+                "지메일 새 메일 조회",
+                "발주 기본정보 구조화",
+                "정상 완료",
+            ),
         ),
         ("/mails", ("(수집 대기)",)),
         ("/mails/message-ui", ("message-ui",)),
@@ -71,6 +88,10 @@ def test_management_pages_render_observable_run(isolated_settings, monkeypatch) 
     assert "discover_gmail" not in run_response.text
     assert "enqueue_message" not in run_response.text
     assert 'branch-column active' in run_response.text
+    assert 'data-node-id="step-1"' in run_response.text
+    assert 'href="/mails"' not in run_response.text
+    assert 'href="/decisions"' not in run_response.text
+    assert 'href="/cases">진행 업무</a>' in run_response.text
 
     workflow_response = client.get("/workflows/mail_processing")
     for internal_key in (

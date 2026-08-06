@@ -8,8 +8,14 @@ import pytest
 from pungmail.adapters.catalog import CompanyCatalog
 from pungmail.adapters.openai_decision import MODEL_ID, OpenAIMailDecisionClient
 from pungmail.config import Settings
-from pungmail.domain.decisions import MailDecision
-from pungmail.prompts import build_prompt_bundle
+from pungmail.domain.decisions import MailClassification, MailDecision
+from pungmail.prompts import (
+    PromptStage,
+    build_category_prompt_bundle,
+    build_classification_prompt_bundle,
+    build_prompt_bundle,
+    build_prompt_trace,
+)
 
 
 def sample_decision() -> dict[str, object]:
@@ -75,13 +81,36 @@ def test_prompt_manifest_is_deterministic_and_complete() -> None:
     first = build_prompt_bundle()
     second = build_prompt_bundle()
     assert first.sha256 == second.sha256
-    assert first.version == "issue2-real-v3"
+    assert first.version == "issue2-real-v4"
     assert len(first.files) == 9
     assert all(len(item.sha256) == 64 for item in first.files)
     assert "메일 한 건" in first.content
     assert "최초 주문 방향은 바뀌지 않는다" in first.content
     assert "해외업무보다 풍림자료요청을 우선" in first.content
     assert "고객이 시작한 업무 방향은 바뀌지 않는다" in first.content
+
+
+def test_prompt_trace_contains_only_prompts_used_by_each_stage() -> None:
+    classification = build_classification_prompt_bundle()
+    category_processing = build_category_prompt_bundle("해외업무")
+    trace = build_prompt_trace(
+        PromptStage(name="CATEGORY_CLASSIFICATION", bundle=classification),
+        PromptStage(
+            name="CATEGORY_PROCESSING",
+            category="해외업무",
+            bundle=category_processing,
+        ),
+    )
+
+    assert [item.path for item in classification.files] == [
+        "common.md",
+        "classification.md",
+    ]
+    assert [item.path for item in category_processing.files] == [
+        "common.md",
+        "categories/overseas_work.md",
+    ]
+    assert trace.manifest()["stages"][1]["category"] == "해외업무"
 
 
 def test_duplicate_request_components_keep_completed_evidence() -> None:
@@ -125,11 +154,11 @@ def test_company_catalog_retains_duplicates_and_hides_deleted() -> None:
 
 
 class FakeResponse:
-    id = "resp_test"
     usage = SimpleNamespace(input_tokens=20, output_tokens=10)
 
-    def __init__(self) -> None:
-        self.output_parsed = MailDecision.model_validate(sample_decision())
+    def __init__(self, response_id: str, output_parsed: object) -> None:
+        self.id = response_id
+        self.output_parsed = output_parsed
 
     def model_dump(self, **kwargs):  # noqa: ANN003, ANN201
         return {"id": self.id, "output": self.output_parsed.model_dump(mode="json")}
@@ -141,10 +170,18 @@ class FakeResponses:
 
     def parse(self, **kwargs):  # noqa: ANN003, ANN201
         self.calls.append(kwargs)
-        return FakeResponse()
+        if kwargs["text_format"] is MailClassification:
+            return FakeResponse(
+                "resp_classification",
+                MailClassification(category="샘플자료견적"),
+            )
+        return FakeResponse(
+            "resp_category_processing",
+            MailDecision.model_validate(sample_decision()),
+        )
 
 
-def test_openai_adapter_uses_one_fixed_model_call(tmp_path: Path) -> None:
+def test_openai_adapter_uses_two_stage_fixed_model_calls(tmp_path: Path) -> None:
     parser = FakeResponses()
     settings = Settings(
         project_root=tmp_path,
@@ -156,8 +193,17 @@ def test_openai_adapter_uses_one_fixed_model_call(tmp_path: Path) -> None:
     )
     client = OpenAIMailDecisionClient(settings, parser=parser)
     result = client.decide({"message_id": "message-1"}, [])
-    assert len(parser.calls) == 1
-    assert parser.calls[0]["model"] == MODEL_ID
-    assert parser.calls[0]["text_format"] is MailDecision
+    assert len(parser.calls) == 2
+    assert all(call["model"] == MODEL_ID for call in parser.calls)
+    assert parser.calls[0]["text_format"] is MailClassification
+    assert "# 카테고리 분류" in parser.calls[0]["instructions"]
+    assert "# 샘플·자료·견적" not in parser.calls[0]["instructions"]
+    assert parser.calls[1]["text_format"] is MailDecision
+    assert "# 카테고리 분류" not in parser.calls[1]["instructions"]
+    assert "# 샘플·자료·견적" in parser.calls[1]["instructions"]
     assert result.decision.category.value == "샘플자료견적"
+    assert [stage.name for stage in result.prompt_trace.stages] == [
+        "CATEGORY_CLASSIFICATION",
+        "CATEGORY_PROCESSING",
+    ]
     assert (tmp_path / result.raw_response_path).exists()

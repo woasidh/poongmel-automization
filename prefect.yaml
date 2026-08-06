@@ -19,9 +19,9 @@ deployments:
       work_queue_name: default
       job_variables: {}
     schedules:
-      - cron: "* * * * *"
-        timezone: Asia/Seoul
-        active: true
+      # Safe deployment default. scripts/start.ps1 applies the .env toggle and interval.
+      - interval: 60
+        active: false
 
   - name: local-order-status-refresh
     version: issue-1
