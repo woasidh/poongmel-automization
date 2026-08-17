@@ -15,9 +15,10 @@
     async function connect(){
       const status=document.getElementById("status");
       try{
-        const response=await fetch("./target.txt?ts="+Date.now(),{cache:"no-store"});
+        const response=await fetch("https://api.github.com/repos/woasidh/poongmel-automization/contents/target.txt?ref=gh-pages&ts="+Date.now(),{cache:"no-store",headers:{Accept:"application/vnd.github+json"}});
         if(!response.ok)throw new Error("address unavailable");
-        const target=(await response.text()).trim();
+        const payload=await response.json();
+        const target=atob(payload.content.replace(/\s/g,"")).trim();
         if(!/^https:\/\/[-a-z0-9]+\.trycloudflare\.com$/.test(target))throw new Error("invalid address");
         window.location.replace(target);
       }catch(error){status.textContent="?꾩옱 二쇱냼瑜?媛?몄삤吏 紐삵뻽?듬땲?? ?좎떆 ???ㅼ떆 ?쒕룄?댁＜?몄슂.";}
