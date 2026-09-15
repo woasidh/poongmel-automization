@@ -1,10 +1,10 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>?띾찞??愿由?UI ?곌껐</title>
+  <title>풍멜이 관리 UI 연결</title>
   <style>
     body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f2f5f2;color:#17251e;font-family:system-ui,"Malgun Gothic",sans-serif}
     main{width:min(420px,calc(100% - 48px));padding:36px;border:1px solid #dfe6e0;border-radius:20px;background:#fff;box-shadow:0 18px 55px rgba(20,50,35,.12);text-align:center}
@@ -21,12 +21,12 @@
         const target=atob(payload.content.replace(/\s/g,"")).trim();
         if(!/^https:\/\/[-a-z0-9]+\.trycloudflare\.com$/.test(target))throw new Error("invalid address");
         window.location.replace(target);
-      }catch(error){status.textContent="?꾩옱 二쇱냼瑜?媛?몄삤吏 紐삵뻽?듬땲?? ?좎떆 ???ㅼ떆 ?쒕룄?댁＜?몄슂.";}
+      }catch(error){status.textContent="현재 주소를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.";}
     }
     window.addEventListener("DOMContentLoaded",connect);
   </script>
 </head>
 <body>
-  <main><b>P</b><h1>?띾찞?대줈 ?곌껐 以?/h1><p id="status">??긽 理쒖떊 ?묒냽 二쇱냼瑜??뺤씤?섍퀬 ?덉뒿?덈떎.</p><button type="button" onclick="connect()">?ㅼ떆 ?쒕룄</button></main>
+  <main><b>P</b><h1>풍멜이로 연결 중</h1><p id="status">항상 최신 접속 주소를 확인하고 있습니다.</p><button type="button" onclick="connect()">다시 시도</button></main>
 </body>
 </html>
